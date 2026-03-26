@@ -135,6 +135,12 @@ Ensure your global npm bin directory is in your PATH.
 
 ---
 
+## 📦 Versioning
+
+This project follows [ZeroVer](https://0ver.org/) (0-based versioning).
+
+---
+
 ## 📄 License
 
 MIT — see [LICENSE](./LICENSE)
