@@ -5,7 +5,7 @@
   "type": "module",
   "exports": null,
   "bin": {
-    "claude-code-bar": "bin/cc-bar.mjs"
+    "claude-code-bar": "bin/claude-code-bar.mjs"
   },
   "files": [
     "bin/",

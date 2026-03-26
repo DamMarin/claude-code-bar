@@ -3,7 +3,7 @@ import { readFileSync, writeFileSync, mkdirSync, lstatSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-const CACHE_DIR = join(homedir(), ".cache", "cc-bar");
+const CACHE_DIR = join(homedir(), ".cache", "claude-code-bar");
 const CACHE_PATH = join(CACHE_DIR, "git-cache.json");
 const CACHE_TTL_MS = 5000;
 const MAX_BUFFER = 64 * 1024; // 64 KB — plenty for branch names and porcelain output

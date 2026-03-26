@@ -40,7 +40,7 @@ export async function install() {
   // Set statusLine config
   settings.statusLine = {
     type: "command",
-    command: "cc-bar",
+    command: "claude-code-bar",
     padding: 0,
   };
 
@@ -49,10 +49,10 @@ export async function install() {
 
   // Verify PATH
   try {
-    execSync("command -v cc-bar", { stdio: "pipe", timeout: 3000 });
+    execSync("command -v claude-code-bar", { stdio: "pipe", timeout: 3000 });
   } catch {
     console.warn(
-      "⚠️  Warning: 'cc-bar' is not found on your PATH.\n" +
+      "⚠️  Warning: 'claude-code-bar' is not found on your PATH.\n" +
       "   Claude Code won't be able to run it.\n" +
       "   Make sure npm's global bin directory is in your PATH:\n" +
       `   export PATH="$(npm prefix -g)/bin:$PATH"`

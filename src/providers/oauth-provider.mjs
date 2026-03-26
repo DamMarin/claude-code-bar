@@ -3,7 +3,7 @@ import { readFileSync, writeFileSync, mkdirSync, lstatSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-const CACHE_DIR = join(homedir(), ".cache", "cc-bar");
+const CACHE_DIR = join(homedir(), ".cache", "claude-code-bar");
 const CACHE_PATH = join(CACHE_DIR, "usage-cache.json");
 const CACHE_TTL_MS = 60000;
 const MAX_BUFFER = 16 * 1024; // 16 KB — credentials JSON is small
@@ -142,7 +142,7 @@ export async function fetchUsage() {
       headers: {
         "Authorization": `Bearer ${token}`,
         "Content-Type": "application/json",
-        "User-Agent": "cc-bar",
+        "User-Agent": "claude-code-bar",
         "anthropic-beta": "oauth-2025-04-20",
       },
       signal: controller.signal,

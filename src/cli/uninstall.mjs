@@ -38,5 +38,5 @@ export async function uninstall() {
 
   console.log("✅ Claude Code Bar uninstalled.");
   console.log("   Restart Claude Code to apply.");
-  console.log("   To also remove the package: npm uninstall -g cc-bar");
+  console.log("   To also remove the package: npm uninstall -g claude-code-bar");
 }
