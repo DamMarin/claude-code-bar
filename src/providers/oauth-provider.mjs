@@ -76,7 +76,9 @@ function isValidCacheData(data) {
   return data
     && typeof data === "object"
     && isValidUsageEntry(data.fiveHour)
-    && isValidUsageEntry(data.sevenDay);
+    && isValidUsageEntry(data.sevenDay)
+    && isValidUsageEntry(data.sevenDaySonnet)
+    && isValidUsageEntry(data.extraUsage);
 }
 
 function isSafeToWrite(filePath) {
