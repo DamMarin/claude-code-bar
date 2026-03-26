@@ -49,7 +49,7 @@ export async function install() {
 
   // Verify PATH
   try {
-    execSync("command -v claude-code-bar", { stdio: "pipe", timeout: 3000 });
+    execSync("which claude-code-bar", { stdio: "pipe", timeout: 3000 });
   } catch {
     console.warn(
       "⚠️  Warning: 'claude-code-bar' is not found on your PATH.\n" +
