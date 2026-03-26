@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+
+# Build & output
+dist/
+build/
+*.tgz
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Claude
+.claude/
+
+# Documentation
+.docs
