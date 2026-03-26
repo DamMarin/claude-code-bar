@@ -1,6 +1,6 @@
 {
   "name": "claude-code-bar",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Real-time status bar for Claude Code showing context usage, rate limits, and git state",
   "type": "module",
   "exports": null,
