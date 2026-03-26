@@ -35,16 +35,13 @@ export async function render() {
     const cwd = safeString(data?.workspace?.current_dir, process.cwd());
     const durationMs = safeNumber(data?.cost?.total_duration_ms, 0, 0);
     const gitInfo = getGitInfo(cwd);
-    const compact = (process.stdout.columns || 80) < 80;
 
-    // Build Line 1
     const parts = [
-      seg.modelSegment(model, compact),
-      seg.contextSegment(ctxPct, compact),
-      seg.directorySegment(cwd, compact),
-      seg.gitSegment(gitInfo, compact),
-      seg.durationSegment(durationMs, compact),
-      seg.effortSegment(settings.effortLevel, compact),
+      seg.modelSegment(model),
+      seg.contextSegment(ctxPct),
+      seg.durationSegment(durationMs),
+      seg.directorySegment(cwd),
+      seg.gitSegment(gitInfo),
     ].filter(Boolean);
 
     console.log(parts.join(" │ "));
@@ -70,7 +67,7 @@ export async function render() {
       console.log(seg.rateLimitSegment("📅 7d", rateLimits.sevenDay.percentage, rateLimits.sevenDay.resetsAt));
     }
     if (rateLimits?.sevenDaySonnet) {
-      console.log(seg.rateLimitSegment("🎵 S", rateLimits.sevenDaySonnet.percentage, rateLimits.sevenDaySonnet.resetsAt));
+      console.log(seg.rateLimitSegment("📜 S", rateLimits.sevenDaySonnet.percentage, rateLimits.sevenDaySonnet.resetsAt));
     }
     if (rateLimits?.extraUsage && rateLimits.extraUsage.percentage > 0) {
       console.log(seg.rateLimitSegment("💰 Extra", rateLimits.extraUsage.percentage, rateLimits.extraUsage.resetsAt));

@@ -6,10 +6,11 @@ Never lose track of Claude Code context usage, rate limits, and git state - all 
 
 
 ```text
-🤖 Sonnet 4.6 │ 🧠 ▓▓▓░░░░░░░ 30% │ 📁 my-project │ 🌿 main* │ ⏱️ 2m14s │ ⚡ high
+🤖 Sonnet 4.6 │ 🧠 30% │ ⏱️ 2m14s │ my-project │ main*
 ⏱️ 5h  ▓▓▓▓▓░░░░░ 48%  resets 14:30
 📅 7d  ▓▓░░░░░░░░ 21%  resets Thu
-````
+📜 S   ▓░░░░░░░░░ 5%   resets Sun
+```
 
 ---
 
@@ -34,7 +35,7 @@ Claude Code doesn’t show everything you need in one place.
 * **Rate limits** → no more guessing or checking dashboards
 * **Git state** → always know your branch and dirty status
 * **Session duration** → track how long you've been working
-* **Model & effort** → see exactly what you're running
+* **Model** → see exactly what you're running
 
 All in one clean status bar.
 
@@ -42,13 +43,12 @@ All in one clean status bar.
 
 ## 🧩 What you get
 
-* Context window usage bar (color-coded)
+* Context window usage (color-coded)
 * 5-hour & 7-day rate limits
 * Sonnet-specific usage tracking
-* Git branch or commit hash
-* Dirty working tree indicator
-* Session timer
-* Model name & effort level
+* Git branch and dirty indicator
+* Session duration
+* Model name
 
 ---
 
