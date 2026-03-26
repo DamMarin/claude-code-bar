@@ -136,9 +136,10 @@ export async function fetchUsage() {
   const token = resolveToken();
   if (!token) return null;
 
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 3000);
+
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 3000);
 
     const res = await fetch("https://api.anthropic.com/api/oauth/usage", {
       headers: {
@@ -179,6 +180,7 @@ export async function fetchUsage() {
     writeCache(result);
     return result;
   } catch {
+    clearTimeout(timeout);
     return null;
   }
 }
