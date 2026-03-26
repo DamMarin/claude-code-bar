@@ -11,7 +11,11 @@ if (isRenderer) {
 process.on("uncaughtException", () => process.exit(0));
 process.on("unhandledRejection", () => process.exit(0));
 
-if (argv.includes("--install")) {
+if (argv.includes("--version") || argv.includes("-v")) {
+  const { readFileSync } = await import("node:fs");
+  const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
+  console.log(pkg.version);
+} else if (argv.includes("--install")) {
   const { install } = await import("../src/cli/install.mjs");
   await install();
 } else if (argv.includes("--uninstall")) {

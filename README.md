@@ -83,6 +83,20 @@ File: `~/.claude/settings.json`
 
 ---
 
+## 🔄 Update
+
+```bash
+npm update -g claude-code-bar
+```
+
+Check your current version:
+
+```bash
+claude-code-bar --version
+```
+
+---
+
 ## ❌ Uninstall
 
 ```bash
