@@ -1,7 +1,7 @@
 {
   "name": "claude-code-bar",
-  "version": "0.0.1",
-  "description": "Minimal status bar for Claude Code with context, usage & git tracking",
+  "version": "0.0.2",
+  "description": "Real-time status bar for Claude Code showing context usage, rate limits, and git state",
   "type": "module",
   "exports": null,
   "bin": {
@@ -17,12 +17,21 @@
     "claude-code",
     "status-bar",
     "cli",
-    "terminal"
+    "terminal",
+    "status-line",
+    "status-bar",
+    "developer-tools",
+    "productivity",
+    "ai",
+    "llm",
+    "anthropic"
   ],
   "engines": {
     "node": ">=18.0.0"
   },
   "license": "MIT",
+  "author": "Damianos Marinatos",
+  "homepage": "https://github.com/dammarin/claude-code-bar#readme",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/dammarin/claude-code-bar.git"
