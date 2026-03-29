@@ -31,10 +31,10 @@
   },
   "license": "MIT",
   "author": "Damianos Marinatos",
-  "homepage": "https://github.com/dammarin/claude-code-bar#readme",
+  "homepage": "https://github.com/DamMarin/claude-code-bar#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/dammarin/claude-code-bar.git"
+    "url": "git+https://github.com/DamMarin/claude-code-bar.git"
   },
   "dependencies": {}
 }
