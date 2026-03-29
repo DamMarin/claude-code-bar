@@ -15,6 +15,8 @@ if (argv.includes("--version") || argv.includes("-v")) {
   const { readFileSync } = await import("node:fs");
   const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
   console.log(pkg.version);
+  const { printUpdateMessage } = await import("../src/cli/update-check.mjs");
+  printUpdateMessage();
 } else if (argv.includes("--install")) {
   const { install } = await import("../src/cli/install.mjs");
   await install();

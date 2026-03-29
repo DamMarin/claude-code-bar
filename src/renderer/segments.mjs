@@ -29,3 +29,7 @@ export function durationSegment(durationMs) {
 export function rateLimitSegment(label, percentage, resetsAt) {
   return `${label}  ${renderBar(percentage)}  resets ${formatReset(resetsAt)}`;
 }
+
+export function updateSegment(latest) {
+  return `${COLORS.yellow}↑ ${latest}${COLORS.reset}`;
+}

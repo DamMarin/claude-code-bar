@@ -2,6 +2,7 @@ import { parseStdin } from "../providers/stdin-parser.mjs";
 import { getGitInfo } from "../providers/git-provider.mjs";
 import { getSettings } from "../providers/settings-provider.mjs";
 import { fetchUsage } from "../providers/oauth-provider.mjs";
+import { getUpdateInfo, scheduleUpdateCheck } from "../cli/update-check.mjs";
 import * as seg from "./segments.mjs";
 
 function safeString(val, fallback) {
@@ -36,13 +37,19 @@ export async function render() {
     const durationMs = safeNumber(data?.cost?.total_duration_ms, 0, 0);
     const gitInfo = getGitInfo(cwd);
 
+    const updateInfo = getUpdateInfo();
+
     const parts = [
       seg.modelSegment(model),
       seg.contextSegment(ctxPct),
       seg.durationSegment(durationMs),
       seg.directorySegment(cwd),
       seg.gitSegment(gitInfo),
+      updateInfo ? seg.updateSegment(updateInfo.latest) : null,
     ].filter(Boolean);
+
+    // Trigger background check for next time
+    scheduleUpdateCheck();
 
     console.log(parts.join(" │ "));
 
