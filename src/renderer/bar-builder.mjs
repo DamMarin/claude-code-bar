@@ -1,7 +1,7 @@
 import { parseStdin } from "../providers/stdin-parser.mjs";
 import { getGitInfo } from "../providers/git-provider.mjs";
 import { getSettings } from "../providers/settings-provider.mjs";
-import { fetchUsage } from "../providers/oauth-provider.mjs";
+import { fetchUsage, parseExtraUsage } from "../providers/oauth-provider.mjs";
 import { getUpdateInfo, scheduleUpdateCheck } from "../cli/update-check.mjs";
 import * as seg from "./segments.mjs";
 
@@ -61,8 +61,13 @@ export async function render() {
         fiveHour: parseRateLimit(data.rate_limits.five_hour),
         sevenDay: parseRateLimit(data.rate_limits.seven_day),
         sevenDaySonnet: parseRateLimit(data.rate_limits.seven_day_sonnet),
-        extraUsage: parseRateLimit(data.rate_limits.extra_usage),
+        extraUsage: parseExtraUsage(data.rate_limits.extra_usage),
       };
+      // Stdin doesn't always include rich extra_usage fields — fill from OAuth.
+      if (!rateLimits.extraUsage) {
+        const oauth = await fetchUsage();
+        if (oauth?.extraUsage) rateLimits.extraUsage = oauth.extraUsage;
+      }
     } else {
       rateLimits = await fetchUsage();
     }
@@ -76,8 +81,8 @@ export async function render() {
     if (rateLimits?.sevenDaySonnet) {
       console.log(seg.rateLimitSegment("📜 S", rateLimits.sevenDaySonnet.percentage, rateLimits.sevenDaySonnet.resetsAt));
     }
-    if (rateLimits?.extraUsage && rateLimits.extraUsage.percentage > 0) {
-      console.log(seg.rateLimitSegment("💰 Extra", rateLimits.extraUsage.percentage, rateLimits.extraUsage.resetsAt));
+    if (rateLimits?.extraUsage && rateLimits.extraUsage.monthlyLimit > 0) {
+      console.log(seg.extraUsageSegment(rateLimits.extraUsage));
     }
 
   } catch {

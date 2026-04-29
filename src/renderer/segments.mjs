@@ -3,6 +3,7 @@ import { COLORS } from "../shared/colors.mjs";
 import { getContextUsageStyle, renderBar } from "./progress-bar.mjs";
 import { formatDuration } from "../shared/format-duration.mjs";
 import { formatReset } from "../shared/format-reset.mjs";
+import { formatMoney } from "../shared/format-money.mjs";
 
 export function modelSegment(displayName) {
   return `🤖 ${displayName}`;
@@ -28,6 +29,12 @@ export function durationSegment(durationMs) {
 }
 export function rateLimitSegment(label, percentage, resetsAt) {
   return `${label}  ${renderBar(percentage)}  resets ${formatReset(resetsAt)}`;
+}
+
+export function extraUsageSegment(extra) {
+  const used = formatMoney(extra.usedCredits, extra.currency);
+  const limit = formatMoney(extra.monthlyLimit, extra.currency);
+  return `💰 Extra  ${renderBar(extra.percentage)}  ${used} / ${limit}`;
 }
 
 export function updateSegment(latest) {

@@ -72,13 +72,22 @@ function isValidUsageEntry(entry) {
   );
 }
 
+function isValidExtraUsage(entry) {
+  return entry === null || (
+    typeof entry === "object"
+    && Number.isFinite(entry.percentage)
+    && Number.isFinite(entry.usedCredits)
+    && Number.isFinite(entry.monthlyLimit)
+  );
+}
+
 function isValidCacheData(data) {
   return data
     && typeof data === "object"
     && isValidUsageEntry(data.fiveHour)
     && isValidUsageEntry(data.sevenDay)
     && isValidUsageEntry(data.sevenDaySonnet)
-    && isValidUsageEntry(data.extraUsage);
+    && isValidExtraUsage(data.extraUsage);
 }
 
 function isSafeToWrite(filePath) {
@@ -99,7 +108,7 @@ function readCache() {
     // Rehydrate Date objects from serialized cache
     const data = cache.data;
     if (!data || typeof data !== "object") return null;
-    for (const key of ["fiveHour", "sevenDay", "sevenDaySonnet", "extraUsage"]) {
+    for (const key of ["fiveHour", "sevenDay", "sevenDaySonnet"]) {
       if (data[key] && typeof data[key].resetsAt === "string") {
         data[key].resetsAt = new Date(data[key].resetsAt);
         if (isNaN(data[key].resetsAt)) data[key] = null;
@@ -126,6 +135,24 @@ function parseUsageEntry(obj) {
   const resetsAt = new Date(obj.resets_at);
   if (isNaN(resetsAt)) return null;
   return { percentage: Math.max(0, Math.min(100, pct)), resetsAt };
+}
+
+export function parseExtraUsage(obj) {
+  if (!obj || typeof obj !== "object") return null;
+  if (obj.is_enabled === false) return null;
+  const usedCredits = Number(obj.used_credits);
+  const monthlyLimit = Number(obj.monthly_limit);
+  if (!Number.isFinite(usedCredits) || !Number.isFinite(monthlyLimit)) return null;
+  const pct = Number(obj.utilization);
+  const percentage = Number.isFinite(pct)
+    ? Math.max(0, Math.min(100, pct))
+    : (monthlyLimit > 0 ? Math.max(0, Math.min(100, (usedCredits / monthlyLimit) * 100)) : 0);
+  return {
+    percentage,
+    usedCredits: Math.max(0, usedCredits),
+    monthlyLimit: Math.max(0, monthlyLimit),
+    currency: typeof obj.currency === "string" ? obj.currency : null,
+  };
 }
 
 export async function fetchUsage() {
@@ -174,7 +201,7 @@ export async function fetchUsage() {
       fiveHour: parseUsageEntry(json.five_hour),
       sevenDay: parseUsageEntry(json.seven_day),
       sevenDaySonnet: parseUsageEntry(json.seven_day_sonnet),
-      extraUsage: parseUsageEntry(json.extra_usage),
+      extraUsage: parseExtraUsage(json.extra_usage),
     };
 
     writeCache(result);
