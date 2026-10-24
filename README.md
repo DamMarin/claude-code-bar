@@ -148,6 +148,8 @@ File: `~/.claude/settings.json`
 
 Add [display options](#-customize) to `command`, e.g. `"claude-code-bar --theme=ocean --no-emoji"`.
 
+The command can also run claude-code-bar through a package runner (`npx claude-code-bar@latest`, `pnpm dlx`, `yarn dlx`, `bunx`), from a quoted path with spaces (`"/Users/John Doe/bin/claude-code-bar"`), or with shell syntax after the options (`2>/dev/null`). `--install`, `--config` and `--uninstall` recognize all of these and change only the options.
+
 ---
 
 ## 🔄 Update
@@ -213,6 +215,7 @@ Run it directly in Terminal, iTerm or a similar app, not through a pipe or a scr
 * Zero dependencies
 * Never crashes or prints errors to stdout
 * Input is validated and bounded
+* Folder, branch and model names are stripped of escape codes, so they can't control your terminal
 * 5-second hard timeout
 * A mistyped option is skipped, never breaks the bar
 * `NO_COLOR` is respected
