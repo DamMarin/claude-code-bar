@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { constants } from "node:os";
 import readline from "node:readline";
 import { parseOptions, serializeOptions } from "../core/options.mjs";
 import { createMenu, plural } from "../core/menu.mjs";
@@ -41,11 +42,20 @@ export async function configure() {
   const restore = () => {
     if (restored) return;
     restored = true;
-    process.stdout.write(`${CSI}?7h${CSI}?25h${CSI}?1049l`);
-    if (process.stdin.isTTY) process.stdin.setRawMode(false);
+    try {
+      process.stdout.write(`${CSI}?7h${CSI}?25h${CSI}?1049l`);
+      if (process.stdin.isTTY) process.stdin.setRawMode(false);
+    } catch { /* the terminal is already gone, e.g. after SIGHUP */ }
   };
-  // Leave the terminal usable however the process ends
+  // Leave the terminal usable however the process ends. A signal skips the "exit"
+  // event unless it is handled, so a killed or hung-up menu restores the terminal too.
   process.on("exit", restore);
+  for (const signal of ["SIGTERM", "SIGHUP"]) {
+    process.on(signal, () => {
+      restore();
+      process.exit(128 + constants.signals[signal]);
+    });
+  }
 
   const finish = (message) => {
     restore();
