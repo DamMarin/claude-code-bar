@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { compareVersions } from "../src/core/version.mjs";
-import { isOwnStatusLine } from "../src/core/status-line.mjs";
+import { isOwnStatusLine, splitCommand } from "../src/core/status-line.mjs";
 
 const BIN = fileURLToPath(new URL("../bin/claude-code-bar.mjs", import.meta.url));
 const PKG = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
@@ -49,6 +49,30 @@ test("isOwnStatusLine", () => {
   assert.ok(!isOwnStatusLine({ command: "ccusage statusline" }));
   assert.ok(!isOwnStatusLine({ command: "claude-code-bar-fork" }));
   assert.ok(!isOwnStatusLine(null));
+});
+
+test("isOwnStatusLine and splitCommand know package runners", () => {
+  const commands = [
+    ["npx claude-code-bar@latest --theme=ocean", "npx claude-code-bar@latest"],
+    ["npx -y claude-code-bar@1.0.0 --theme=ocean", "npx -y claude-code-bar@1.0.0"],
+    ["npx -p claude-code-bar@^1 claude-code-bar --theme=ocean", "npx -p claude-code-bar@^1 claude-code-bar"],
+    ["bunx claude-code-bar --theme=ocean", "bunx claude-code-bar"],
+    ["bunx --bun claude-code-bar@latest --theme=ocean", "bunx --bun claude-code-bar@latest"],
+    ["pnpm dlx claude-code-bar@latest --theme=ocean", "pnpm dlx claude-code-bar@latest"],
+    ["pnpx claude-code-bar@1.0.0 --theme=ocean", "pnpx claude-code-bar@1.0.0"],
+    ["pnpm exec claude-code-bar --theme=ocean", "pnpm exec claude-code-bar"],
+    ["yarn dlx claude-code-bar@latest --theme=ocean", "yarn dlx claude-code-bar@latest"],
+    ["yarn dlx -q claude-code-bar@1.0.0 --theme=ocean", "yarn dlx -q claude-code-bar@1.0.0"],
+    ["yarn dlx -p claude-code-bar@^1 claude-code-bar --theme=ocean", "yarn dlx -p claude-code-bar@^1 claude-code-bar"],
+    ["yarn claude-code-bar --theme=ocean", "yarn claude-code-bar"],
+    ["yarn exec claude-code-bar --theme=ocean", "yarn exec claude-code-bar"],
+  ];
+  for (const [command, binary] of commands) {
+    assert.ok(isOwnStatusLine({ command }), command);
+    assert.deepEqual(splitCommand(command), { binary, args: ["--theme=ocean"] }, command);
+  }
+  assert.ok(!isOwnStatusLine({ command: "npx claude-code-bar-fork@latest" }));
+  assert.ok(!isOwnStatusLine({ command: "pnpm dlx other-bar@latest" }));
 });
 
 test("render prints the full status bar from stdin", (t) => {
@@ -232,4 +256,20 @@ test("install writes through a symlinked settings.json", (t) => {
   assert.equal(run(home, ["--uninstall"]).status, 0);
   assert.ok(lstatSync(settingsPath).isSymbolicLink());
   assert.deepEqual(JSON.parse(readFileSync(dotfile, "utf8")), { model: "opus" });
+});
+
+test("install keeps a package runner command and uninstall removes it", (t) => {
+  const home = makeHome(t);
+  const settingsPath = join(home, ".claude", "settings.json");
+  const command = () => JSON.parse(readFileSync(settingsPath, "utf8")).statusLine?.command;
+  writeFileSync(settingsPath, JSON.stringify({ statusLine: { type: "command", command: "pnpm dlx claude-code-bar@latest --hide=dir" } }));
+
+  assert.equal(run(home, ["--install", "--theme=ocean"]).status, 0);
+  assert.equal(command(), "pnpm dlx claude-code-bar@latest --theme=ocean");
+  assert.ok(!existsSync(join(home, ".claude", "claude-code-bar.statusline-backup.json")));
+
+  const result = run(home, ["--uninstall"]);
+  assert.equal(result.status, 0);
+  assert.match(result.stdout, /uninstalled/);
+  assert.equal(command(), undefined);
 });
