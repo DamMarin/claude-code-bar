@@ -27,8 +27,9 @@ function makeHome(t) {
 }
 
 function run(home, args, input = "", extraEnv = {}) {
-  const env = { ...process.env, HOME: home, USERPROFILE: home, ...extraEnv };
+  const env = { ...process.env, HOME: home, USERPROFILE: home };
   delete env.CLAUDE_CODE_OAUTH_TOKEN;
+  Object.assign(env, extraEnv);
   return spawnSync(process.execPath, [BIN, ...args], { input, env, encoding: "utf8", timeout: 10_000 });
 }
 
@@ -373,4 +374,28 @@ test("render strips escape codes from the model and folder names", (t) => {
   const result = run(home, ["--hide=context,duration,git,update,5h,7d,sonnet,extra", "--no-color"], input);
   assert.equal(result.status, 0);
   assert.equal(result.stdout, "🤖 Opus 5.5 │ evil-dir\n");
+});
+
+test("the usage cache is dropped when the login changes", (t) => {
+  const home = makeHome(t);
+  const cacheFile = join(home, ".cache", "claude-code-bar", "usage-cache.json");
+  // No usable token anywhere: a too-short env token, and no `security` or `secret-tool` on PATH.
+  // So a cache miss reads no real credentials and makes no network call.
+  const as = (token) => ({ CLAUDE_CODE_OAUTH_TOKEN: token, PATH: join(home, "empty-bin") });
+  const input = JSON.stringify({ workspace: { current_dir: home } });
+  const args = ["--hide=model,context,duration,dir,git,update,7d,sonnet,extra", "--no-color"];
+
+  // The first run caches a failure, stamped with this login's fingerprint
+  assert.equal(run(home, args, input, as("acct-a")).stdout, "");
+  const cache = JSON.parse(readFileSync(cacheFile, "utf8"));
+  assert.equal(cache.data, null);
+  assert.equal(typeof cache.fingerprint, "string");
+
+  // Put usage data in that cache entry: the same login sees it
+  cache.data = { fiveHour: { percentage: 48, resetsAt: null } };
+  writeFileSync(cacheFile, JSON.stringify(cache));
+  assert.equal(run(home, args, input, as("acct-a")).stdout, "⏱️ 5h  ▓▓▓▓▓░░░░░ 48%  resets ?\n");
+
+  // Another login doesn't
+  assert.equal(run(home, args, input, as("acct-b")).stdout, "");
 });

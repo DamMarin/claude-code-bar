@@ -1,6 +1,7 @@
 // Rate limits from the Claude Code OAuth usage API, with the login token
 import { execSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { readCacheJson, writeCacheJson } from "./files.mjs";
@@ -31,6 +32,33 @@ function extractToken(raw) {
   }
 }
 
+const CREDENTIALS_FILE = join(homedir(), ".claude", ".credentials.json");
+// Where the token is stored: the file above, the macOS login keychain, the GNOME keyring
+const CREDENTIAL_STORES = [
+  CREDENTIALS_FILE,
+  join(homedir(), "Library", "Keychains", "login.keychain-db"),
+  join(homedir(), ".local", "share", "keyrings", "login.keyring"),
+];
+
+/**
+ * Changes whenever the login may have: a different CLAUDE_CODE_OAUTH_TOKEN, or a write
+ * to any place the token is stored (a new /login, a token refresh). The cache is only used
+ * while this matches, so another account never sees the last one's usage. It is cheap
+ * (a hash and a few stats), unlike reading the token, which can run `security` every render.
+ */
+function credentialsFingerprint() {
+  const envToken = process.env.CLAUDE_CODE_OAUTH_TOKEN;
+  const parts = [typeof envToken === "string" ? createHash("sha256").update(envToken).digest("hex").slice(0, 16) : ""];
+  for (const store of CREDENTIAL_STORES) {
+    try {
+      parts.push(statSync(store).mtimeMs);
+    } catch {
+      parts.push(0);
+    }
+  }
+  return parts.join(":");
+}
+
 function resolveToken() {
   // 1. Environment variable
   const envToken = process.env.CLAUDE_CODE_OAUTH_TOKEN;
@@ -48,7 +76,7 @@ function resolveToken() {
 
   // 3. File: ~/.claude/.credentials.json
   try {
-    const raw = readFileSync(join(homedir(), ".claude", ".credentials.json"), "utf8");
+    const raw = readFileSync(CREDENTIALS_FILE, "utf8");
     const token = extractToken(raw);
     if (token) return token;
   } catch { /* file not found */ }
@@ -67,10 +95,10 @@ function resolveToken() {
 }
 
 // Returns undefined on a cache miss, null for a cached failure, or the usage data
-function readCache() {
+function readCache(fingerprint) {
   try {
     const cache = readCacheJson(CACHE_NAME);
-    if (!cache || typeof cache !== "object") return undefined;
+    if (!cache || typeof cache !== "object" || cache.fingerprint !== fingerprint) return undefined;
     const ttl = Number.isFinite(cache.ttl) ? cache.ttl : CACHE_TTL_MS;
     if (typeof cache.timestamp !== "number" || (Date.now() - cache.timestamp) >= ttl) {
       return undefined;
@@ -90,15 +118,16 @@ function readCache() {
   return undefined;
 }
 
-function writeCache(data, ttl = CACHE_TTL_MS) {
-  writeCacheJson(CACHE_NAME, { timestamp: Date.now(), ttl, data });
+function writeCache(fingerprint, data, ttl = CACHE_TTL_MS) {
+  writeCacheJson(CACHE_NAME, { timestamp: Date.now(), ttl, fingerprint, data });
 }
 
 // Cache a failure so the API isn't retried on every render
-function cacheFailure(ttl = FAILURE_TTL_MS) {
-  writeCache(null, ttl);
+function cacheFailure(fingerprint, ttl = FAILURE_TTL_MS) {
+  writeCache(fingerprint, null, ttl);
   return null;
 }
+
 
 function rateLimitedTtl(res) {
   const seconds = Number(res.headers.get("retry-after"));
@@ -135,11 +164,12 @@ export function parseExtraUsage(obj) {
 
 export async function fetchUsage() {
   // Check cache first
-  const cached = readCache();
+  const fingerprint = credentialsFingerprint();
+  const cached = readCache(fingerprint);
   if (cached !== undefined) return cached;
 
   const token = resolveToken();
-  if (!token) return cacheFailure();
+  if (!token) return cacheFailure(fingerprint);
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 3000);
@@ -158,20 +188,20 @@ export async function fetchUsage() {
 
     if (!res.ok) {
       clearTimeout(timeout);
-      return cacheFailure(res.status === 429 ? rateLimitedTtl(res) : FAILURE_TTL_MS);
+      return cacheFailure(fingerprint, res.status === 429 ? rateLimitedTtl(res) : FAILURE_TTL_MS);
     }
 
     // Guard against oversized responses
     const contentLength = res.headers.get("content-length");
     if (contentLength && parseInt(contentLength, 10) > MAX_RESPONSE_BYTES) {
       clearTimeout(timeout);
-      return cacheFailure();
+      return cacheFailure(fingerprint);
     }
 
     const text = await res.text();
     clearTimeout(timeout);
 
-    if (text.length > MAX_RESPONSE_BYTES) return cacheFailure();
+    if (text.length > MAX_RESPONSE_BYTES) return cacheFailure(fingerprint);
 
     const json = JSON.parse(text);
 
@@ -182,10 +212,10 @@ export async function fetchUsage() {
       extraUsage: parseExtraUsage(json.extra_usage),
     };
 
-    writeCache(result);
+    writeCache(fingerprint, result);
     return result;
   } catch {
     clearTimeout(timeout);
-    return cacheFailure();
+    return cacheFailure(fingerprint);
   }
 }
