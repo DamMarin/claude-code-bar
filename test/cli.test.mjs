@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, existsSync, rmSync, symlinkSync, lstatSync, chmodSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
@@ -417,3 +417,100 @@ test("install keeps the layout and permissions of settings.json", { skip: proces
     assert.equal(statSync(settingsPath).mode & 0o777, mode);
   }
 });
+
+/* ---------- --config, driven through stand-in terminal streams ---------- */
+
+const CONFIGURE = new URL("../src/commands/configure.mjs", import.meta.url).href;
+const DOWN = "\x1b[B";
+const ENTER_SCREEN = "\x1b[?1049h";
+const LEAVE_SCREEN = "\x1b[?1049l";
+
+// Runs --config with streams that act as a terminal, then types `keys` one by one.
+// The menu draws to stderr; what --config prints after closing goes to stdout.
+function configScript(keys) {
+  return `
+    import { PassThrough } from "node:stream";
+    import { configure } from ${JSON.stringify(CONFIGURE)};
+    const stdin = Object.assign(new PassThrough(), { isTTY: true, setRawMode() { return this; } });
+    const stdout = Object.assign(new PassThrough(), { isTTY: true, columns: 100, rows: 40 });
+    stdout.pipe(process.stderr);
+    setInterval(() => {}, 60_000); // stay alive until the menu exits
+    await configure({ stdin, stdout });
+    for (const key of ${JSON.stringify(keys)}) {
+      await new Promise((resolve) => setTimeout(resolve, 30));
+      stdin.write(key);
+    }
+  `;
+}
+
+function runConfig(home, keys) {
+  const env = { ...process.env, HOME: home, USERPROFILE: home };
+  delete env.CLAUDE_CODE_OAUTH_TOKEN;
+  return spawnSync(process.execPath, ["--input-type=module", "-e", configScript(keys)], { env, encoding: "utf8", timeout: 10_000 });
+}
+
+// The terminal is back to normal: the alternate screen was left after it was entered
+const restored = (screen) => screen.includes(ENTER_SCREEN) && screen.lastIndexOf(LEAVE_SCREEN) > screen.lastIndexOf(ENTER_SCREEN);
+
+test("--config saves the options chosen in the menu", (t) => {
+  const home = makeHome(t);
+  const result = runConfig(home, [DOWN, DOWN, DOWN, DOWN, " ", "\r"]);
+  assert.equal(result.status, 0);
+  assert.match(result.stdout, /✅ Saved to ~\/\.claude\/settings\.json\n\n {3}claude-code-bar --hide=dir\n/);
+  assert.match(result.stderr, /Directory/); // the menu was drawn
+  assert.ok(restored(result.stderr));
+  const settings = JSON.parse(readFileSync(join(home, ".claude", "settings.json"), "utf8"));
+  assert.equal(settings.statusLine.command, "claude-code-bar --hide=dir");
+});
+
+test("--config keeps the program and shell suffix of the current command", (t) => {
+  const home = makeHome(t);
+  const settingsPath = join(home, ".claude", "settings.json");
+  const command = `"${join(home, "my tools", "claude-code-bar")}" --theme=ocean 2>/dev/null`;
+  writeFileSync(settingsPath, JSON.stringify({ statusLine: { type: "command", command } }));
+
+  assert.equal(runConfig(home, ["\r"]).status, 0);
+  assert.equal(JSON.parse(readFileSync(settingsPath, "utf8")).statusLine.command, command);
+});
+
+test("--config saves nothing on Ctrl+C and names flags it ignored", (t) => {
+  const home = makeHome(t);
+  const settingsPath = join(home, ".claude", "settings.json");
+  const original = JSON.stringify({ statusLine: { type: "command", command: "claude-code-bar --bogus" } });
+  writeFileSync(settingsPath, original);
+
+  const result = runConfig(home, [DOWN, " ", "\x03"]);
+  assert.equal(result.status, 0);
+  assert.match(result.stdout, /Cancelled\. Nothing was saved\./);
+  assert.match(result.stderr, /Ignored in your current command: Unknown option: --bogus/);
+  assert.ok(restored(result.stderr));
+  assert.equal(readFileSync(settingsPath, "utf8"), original);
+});
+
+test("--config stops with an unusable settings.json", (t) => {
+  const home = makeHome(t);
+  writeFileSync(join(home, ".claude", "settings.json"), "{ not json");
+  const result = runConfig(home, []);
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /❌ Error: ~\/\.claude\/settings\.json contains invalid JSON/);
+  assert.ok(!result.stderr.includes(ENTER_SCREEN));
+});
+
+for (const [signal, code] of [["SIGTERM", 143], ["SIGHUP", 129]]) {
+  test(`--config restores the terminal on ${signal}`, { skip: process.platform === "win32" && "no POSIX signals" }, async (t) => {
+    const home = makeHome(t);
+    const env = { ...process.env, HOME: home, USERPROFILE: home };
+    const child = spawn(process.execPath, ["--input-type=module", "-e", configScript([])], { env });
+    let screen = "";
+    child.stderr.setEncoding("utf8");
+    // "close", not "exit": by then everything written to stderr has been read
+    const exited = new Promise((resolve) => child.on("close", (status) => resolve(status)));
+    await new Promise((resolve) => child.stderr.on("data", (chunk) => {
+      screen += chunk;
+      if (screen.includes(ENTER_SCREEN)) resolve();
+    }));
+    child.kill(signal);
+    assert.equal(await exited, code);
+    assert.ok(restored(screen));
+  });
+}

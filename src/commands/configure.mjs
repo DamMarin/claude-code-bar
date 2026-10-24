@@ -13,8 +13,12 @@ const KEY_NAMES = {
   return: "Enter", enter: "Enter", escape: "Escape", tab: "Tab", space: " ",
 };
 
-export async function configure() {
-  if (!process.stdin.isTTY || !process.stdout.isTTY) {
+/**
+ * The interactive --config menu. `stdin` and `stdout` are the terminal; tests pass
+ * stand-ins that act as one, so the menu can be driven without a real terminal.
+ */
+export async function configure({ stdin = process.stdin, stdout = process.stdout } = {}) {
+  if (!stdin.isTTY || !stdout.isTTY) {
     console.error(
       "❌ --config needs an interactive terminal.\n" +
       "   To set options without the menu, pass them to --install, e.g.\n" +
@@ -43,8 +47,8 @@ export async function configure() {
     if (restored) return;
     restored = true;
     try {
-      process.stdout.write(`${CSI}?7h${CSI}?25h${CSI}?1049l`);
-      if (process.stdin.isTTY) process.stdin.setRawMode(false);
+      stdout.write(`${CSI}?7h${CSI}?25h${CSI}?1049l`);
+      if (stdin.isTTY) stdin.setRawMode(false);
     } catch { /* the terminal is already gone, e.g. after SIGHUP */ }
   };
   // Leave the terminal usable however the process ends. A signal skips the "exit"
@@ -64,17 +68,17 @@ export async function configure() {
   };
 
   const draw = () => {
-    const lines = menu.frame(process.stdout.columns || 80, process.stdout.rows || 30);
-    process.stdout.write(`${CSI}H${lines.map((l) => `${l}${CSI}0m${CSI}K`).join("\r\n")}${CSI}J`);
+    const lines = menu.frame(stdout.columns || 80, stdout.rows || 30);
+    stdout.write(`${CSI}H${lines.map((l) => `${l}${CSI}0m${CSI}K`).join("\r\n")}${CSI}J`);
   };
 
-  readline.emitKeypressEvents(process.stdin);
-  process.stdin.setRawMode(true);
+  readline.emitKeypressEvents(stdin);
+  stdin.setRawMode(true);
   // Alternate screen, hidden cursor, no line wrapping (long lines are clipped)
-  process.stdout.write(`${CSI}?1049h${CSI}?25l${CSI}?7l`);
-  process.stdout.on("resize", draw);
+  stdout.write(`${CSI}?1049h${CSI}?25l${CSI}?7l`);
+  stdout.on("resize", draw);
 
-  process.stdin.on("keypress", (str, key = {}) => {
+  stdin.on("keypress", (str, key = {}) => {
     if (key.ctrl && key.name === "c") finish("Cancelled. Nothing was saved.");
     const name = KEY_NAMES[key.name] ?? (key.shift && key.name === "r" ? "R" : str);
     if (!name) return;
