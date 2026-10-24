@@ -399,3 +399,21 @@ test("the usage cache is dropped when the login changes", (t) => {
   // Another login doesn't
   assert.equal(run(home, args, input, as("acct-b")).stdout, "");
 });
+
+test("install keeps the layout and permissions of settings.json", { skip: process.platform === "win32" }, (t) => {
+  const home = makeHome(t);
+  const settingsPath = join(home, ".claude", "settings.json");
+  const statusLine = { type: "command", command: "claude-code-bar", padding: 0 };
+  const cases = [
+    ['{\n\t"model": "opus"\n}\n', 0o644, '{\n\t"model": "opus",\n\t"statusLine": {\n\t\t"type": "command",\n\t\t"command": "claude-code-bar",\n\t\t"padding": 0\n\t}\n}\n'],
+    ['{\n    "model": "opus"\n}', 0o640, `${JSON.stringify({ model: "opus", statusLine }, null, 4)}`],
+    ['{"model":"opus"}\n', 0o600, `${JSON.stringify({ model: "opus", statusLine })}\n`],
+  ];
+  for (const [original, mode, expected] of cases) {
+    writeFileSync(settingsPath, original);
+    chmodSync(settingsPath, mode);
+    assert.equal(run(home, ["--install"]).status, 0);
+    assert.equal(readFileSync(settingsPath, "utf8"), expected);
+    assert.equal(statSync(settingsPath).mode & 0o777, mode);
+  }
+});

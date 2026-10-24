@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, mkdirSync, renameSync, lstatSync, realpathSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, renameSync, lstatSync, realpathSync, statSync, chmodSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
@@ -23,12 +23,31 @@ function resolveLink(filePath) {
   }
 }
 
+// How an existing JSON file is laid out: its indent (tabs, spaces, or 0 for a one-line file),
+// whether it ends with a newline, and its permissions. A new file gets 2 spaces and mode 0600.
+function layoutOf(filePath) {
+  let raw;
+  let mode;
+  try {
+    raw = readFileSync(filePath, "utf8");
+    mode = statSync(filePath).mode & 0o777;
+  } catch {
+    return { indent: 2, newline: true, mode: 0o600 };
+  }
+  const indented = /^([ \t]+)["}\]]/m.exec(raw);
+  const oneLine = !indented && raw.trim().length > 2; // "{}" alone says nothing about the style
+  return { indent: indented ? indented[1] : oneLine ? 0 : 2, newline: raw.endsWith("\n") || !raw.trim(), mode };
+}
+
 // Write to a temp file, then rename, so readers never see a half-written file.
-// A symlinked file (e.g. settings.json kept in a dotfiles repo) is written through, not replaced.
+// A symlinked file (e.g. settings.json kept in a dotfiles repo) is written through, not replaced,
+// and the file keeps its layout and permissions, so a rewrite changes only the data.
 export function atomicWriteJson(filePath, data) {
   const target = resolveLink(filePath);
+  const { indent, newline, mode } = layoutOf(target);
   const tmp = target + ".tmp." + process.pid;
-  writeFileSync(tmp, JSON.stringify(data, null, 2) + "\n", { mode: 0o600 });
+  writeFileSync(tmp, JSON.stringify(data, null, indent) + (newline ? "\n" : ""), { mode });
+  chmodSync(tmp, mode); // exactly the old mode, whatever the umask
   renameSync(tmp, target);
 }
 
