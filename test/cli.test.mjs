@@ -127,3 +127,23 @@ test("uninstall removes our statusLine when there is no backup", (t) => {
   assert.equal(run(home, ["--uninstall"]).status, 0);
   assert.deepEqual(JSON.parse(readFileSync(settingsPath, "utf8")), { model: "opus" });
 });
+
+test("--help and -h print usage", (t) => {
+  const home = makeHome(t);
+  for (const flag of ["--help", "-h"]) {
+    const result = run(home, [flag]);
+    assert.equal(result.status, 0);
+    assert.match(result.stdout, new RegExp(`^claude-code-bar ${PKG.version.replace(/\./g, "\\.")}\\n`));
+    assert.match(result.stdout, /--install/);
+    assert.match(result.stdout, /--uninstall/);
+  }
+});
+
+test("an unknown option fails with usage on stderr", (t) => {
+  const home = makeHome(t);
+  const result = run(home, ["--instal"]);
+  assert.equal(result.status, 1);
+  assert.equal(result.stdout, "");
+  assert.match(result.stderr, /^Unknown option: --instal\n/);
+  assert.match(result.stderr, /Usage:/);
+});
