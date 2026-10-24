@@ -1,8 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { formatDuration } from "../src/shared/format-duration.mjs";
-import { formatMoney } from "../src/shared/format-money.mjs";
-import { formatReset } from "../src/shared/format-reset.mjs";
+import { formatDuration } from "../src/core/format-duration.mjs";
+import { formatMoney } from "../src/core/format-money.mjs";
+import { formatReset } from "../src/core/format-reset.mjs";
 
 const HOUR = 60 * 60 * 1000;
 

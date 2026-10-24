@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
-import { BAR_STYLES, SEGMENTS, SEPARATORS, THEMES } from "../shared/options.mjs";
-import { bannerLines } from "./banner.mjs";
+import { BAR_STYLES, SEGMENTS, SEPARATORS, THEMES } from "../core/options.mjs";
+import { bannerLines } from "../core/banner.mjs";
 
 // The logo is for --help and manual runs; error messages use the plain title
 export function helpText({ banner = false } = {}) {

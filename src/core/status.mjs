@@ -1,7 +1,7 @@
-import { SEPARATORS } from "../shared/options.mjs";
-import { formatDuration } from "../shared/format-duration.mjs";
-import { formatMoney } from "../shared/format-money.mjs";
-import { formatCountdown, formatReset } from "../shared/format-reset.mjs";
+import { SEPARATORS } from "./options.mjs";
+import { formatDuration } from "./format-duration.mjs";
+import { formatMoney } from "./format-money.mjs";
+import { formatCountdown, formatReset } from "./format-reset.mjs";
 import { barCells } from "./progress-bar.mjs";
 import { paint, resolvePalette, styleFor } from "./style.mjs";
 
@@ -19,9 +19,10 @@ const clamp = (pct) => Math.max(0, Math.min(100, Number.isFinite(pct) ? pct : 0)
  *
  * `mark` lists what to underline, for the --config preview: segment keys,
  * "levels", "lvl-low|medium|high", "accent", "pct", "bars", "reset", "sep", "labels".
+ * `noColor` turns colors off, as NO_COLOR does.
  */
-export function renderStatus(data, options, { mark = [], env = process.env } = {}) {
-  const palette = resolvePalette(options, env);
+export function renderStatus(data, options, { mark = [], noColor = false } = {}) {
+  const palette = resolvePalette(options, noColor);
   const marks = new Set(mark);
   const m = (...categories) => categories.some((c) => marks.has(c));
   const emoji = options.emoji;

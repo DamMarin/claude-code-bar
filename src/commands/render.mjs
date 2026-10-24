@@ -1,30 +1,12 @@
+// The status bar itself: gathers data from io/, renders it with core/, prints it
 import { basename } from "node:path";
-import { parseStdin } from "../providers/stdin-parser.mjs";
-import { getGitInfo } from "../providers/git-provider.mjs";
-import { getSettings } from "../providers/settings-provider.mjs";
-import { fetchUsage, parseExtraUsage } from "../providers/oauth-provider.mjs";
-import { getUpdateInfo, scheduleUpdateCheck } from "../cli/update-check.mjs";
-import { DEFAULT_OPTIONS, RATE_LIMITS } from "../shared/options.mjs";
-import { renderStatus } from "./status.mjs";
-
-function safeString(val, fallback) {
-  return typeof val === "string" && val.length > 0 && val.length < 256 ? val : fallback;
-}
-
-function safeNumber(val, fallback, min = 0, max = Infinity) {
-  const n = Number(val);
-  if (!Number.isFinite(n)) return fallback;
-  return Math.max(min, Math.min(max, n));
-}
-
-export function parseRateLimit(obj) {
-  if (!obj || typeof obj !== "object") return null;
-  const pct = safeNumber(obj.used_percentage, null, 0, 100);
-  if (pct === null) return null;
-  // Missing reset time stays null (rendered as "?"), not the 1970 epoch
-  const ts = safeNumber(obj.resets_at, 0, 0);
-  return { percentage: pct, resetsAt: ts > 0 ? new Date(ts * 1000) : null };
-}
+import { DEFAULT_OPTIONS, RATE_LIMITS } from "../core/options.mjs";
+import { renderStatus } from "../core/status.mjs";
+import { readStdin, parseRateLimit, safeNumber, safeString } from "../io/stdin.mjs";
+import { getGitInfo } from "../io/git.mjs";
+import { readDefaultModel } from "../io/settings-file.mjs";
+import { fetchUsage, parseExtraUsage } from "../io/usage-api.mjs";
+import { getUpdateInfo, scheduleUpdateCheck } from "../io/update-check.mjs";
 
 // Rate limits: prefer stdin data, fall back to the OAuth usage API.
 // Nothing is fetched (and no token is read) for limits that are hidden.
@@ -51,15 +33,14 @@ async function loadRateLimits(data, hidden) {
 
 export async function render(options = DEFAULT_OPTIONS) {
   try {
-    const data = await parseStdin();
+    const data = await readStdin();
     if (!data) process.exit(0);
 
     // Extract with fallbacks and type validation
     const hidden = new Set(options.hidden);
-    const settings = getSettings();
     const cwd = safeString(data?.workspace?.current_dir, process.cwd());
     const status = {
-      model: safeString(data?.model?.display_name, null) || safeString(settings.model, "unknown"),
+      model: safeString(data?.model?.display_name, null) || safeString(readDefaultModel(), "unknown"),
       contextPct: safeNumber(data?.context_window?.used_percentage, 0, 0, 100),
       durationMs: safeNumber(data?.cost?.total_duration_ms, 0, 0),
       dir: basename(cwd),
@@ -75,13 +56,14 @@ export async function render(options = DEFAULT_OPTIONS) {
 
     // Print the first line before any network call, so a slow API never blanks the bar
     const compact = options.layout === "compact";
+    const noColor = Boolean(process.env.NO_COLOR);
     if (!compact) {
-      const { head } = renderStatus(status, options);
+      const { head } = renderStatus(status, options, { noColor });
       if (head) console.log(head);
     }
 
     status.limits = await loadRateLimits(data, hidden);
-    const { head, rows } = renderStatus(status, options);
+    const { head, rows } = renderStatus(status, options, { noColor });
     if (compact && head) console.log(head);
     for (const row of rows) console.log(row);
   } catch {

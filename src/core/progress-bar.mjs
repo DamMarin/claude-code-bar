@@ -1,4 +1,4 @@
-import { BAR_STYLES } from "../shared/options.mjs";
+import { BAR_STYLES } from "./options.mjs";
 
 // The bar's cells for a fill percentage, without color or label
 export function barCells(percentage, styleName = "shade", width = 10) {

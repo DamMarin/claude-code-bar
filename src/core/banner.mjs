@@ -1,4 +1,4 @@
-import { paint } from "../renderer/style.mjs";
+import { paint } from "./style.mjs";
 
 // "claude code bar" in two rows of half blocks
 const BANNER = [

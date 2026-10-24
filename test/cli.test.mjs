@@ -5,8 +5,8 @@ import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, existsSync, rmSync
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { compareVersions } from "../src/cli/update-check.mjs";
-import { isOwnStatusLine } from "../src/cli/status-line.mjs";
+import { compareVersions } from "../src/core/version.mjs";
+import { isOwnStatusLine } from "../src/core/status-line.mjs";
 
 const BIN = fileURLToPath(new URL("../bin/claude-code-bar.mjs", import.meta.url));
 const PKG = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));

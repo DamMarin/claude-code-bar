@@ -1,8 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseExtraUsage } from "../src/providers/oauth-provider.mjs";
-import { parseRateLimit } from "../src/renderer/bar-builder.mjs";
-import { barCells } from "../src/renderer/progress-bar.mjs";
+import { parseExtraUsage } from "../src/io/usage-api.mjs";
+import { parseRateLimit } from "../src/io/stdin.mjs";
+import { barCells } from "../src/core/progress-bar.mjs";
 
 test("parseRateLimit", () => {
   assert.equal(parseRateLimit(null), null);

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { argv } from "node:process";
-import { parseOptions } from "../src/shared/options.mjs";
+import { parseOptions } from "../src/core/options.mjs";
 
 const MODES = {
   "--install": "install", "--uninstall": "uninstall", "--config": "config",
@@ -23,7 +23,7 @@ process.on("unhandledRejection", () => process.exit(0));
 const { options, errors } = parseOptions(optionArgs);
 
 async function fail(messages) {
-  const { helpText } = await import("../src/cli/help.mjs");
+  const { helpText } = await import("../src/commands/help.mjs");
   console.error(`${messages.join("\n")}\n`);
   console.error(helpText());
   process.exit(1);
@@ -36,31 +36,28 @@ if (modes.length > 1) {
 } else if (mode === "install" && errors.length) {
   await fail(errors);
 } else if (mode === "help") {
-  const { helpText } = await import("../src/cli/help.mjs");
+  const { helpText } = await import("../src/commands/help.mjs");
   console.log(helpText({ banner: true }));
 } else if (mode === "version") {
-  const { readFileSync } = await import("node:fs");
-  const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
-  console.log(pkg.version);
-  const { printUpdateMessage } = await import("../src/cli/update-check.mjs");
-  printUpdateMessage();
+  const { version } = await import("../src/commands/version.mjs");
+  version();
 } else if (mode === "install") {
-  const { install } = await import("../src/cli/install.mjs");
+  const { install } = await import("../src/commands/install.mjs");
   await install(optionArgs.length ? options : null);
 } else if (mode === "uninstall") {
-  const { uninstall } = await import("../src/cli/uninstall.mjs");
+  const { uninstall } = await import("../src/commands/uninstall.mjs");
   await uninstall();
 } else if (mode === "config") {
-  const { configure } = await import("../src/cli/configure.mjs");
+  const { configure } = await import("../src/commands/configure.mjs");
   await configure();
 } else if (process.stdin.isTTY) {
   // Run by hand in a terminal: there is no status JSON to read, so explain instead of exiting silently
   if (errors.length) await fail(errors);
-  const { helpText } = await import("../src/cli/help.mjs");
+  const { helpText } = await import("../src/commands/help.mjs");
   console.log(helpText({ banner: true }));
   console.log("Nothing to show: claude-code-bar expects Claude Code's status JSON on stdin.");
 } else {
   // Run by Claude Code: a bad flag is skipped so the status bar still renders
-  const { render } = await import("../src/renderer/bar-builder.mjs");
+  const { render } = await import("../src/commands/render.mjs");
   await render(options);
 }

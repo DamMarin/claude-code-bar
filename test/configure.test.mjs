@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { createMenu } from "../src/cli/configure.mjs";
-import { DEFAULT_OPTIONS, cloneOptions, parseOptions, serializeOptions } from "../src/shared/options.mjs";
+import { createMenu } from "../src/core/menu.mjs";
+import { DEFAULT_OPTIONS, cloneOptions, parseOptions, serializeOptions } from "../src/core/options.mjs";
 
 const plain = (lines) => lines.join("\n").replace(/\x1b\[[0-9;]*m/g, "");
 const press = (menu, ...keys) => keys.map((k) => (k === "S-Tab" ? menu.onKey("Tab", true) : menu.onKey(k))).at(-1);

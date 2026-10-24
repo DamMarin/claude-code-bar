@@ -1,8 +1,8 @@
-import { COLOR_CODES, THEMES } from "../shared/options.mjs";
+import { COLOR_CODES, THEMES } from "./options.mjs";
 
-// What the current theme does with colors. NO_COLOR (no-color.org) always wins.
-export function resolvePalette(options, env = process.env) {
-  if (env.NO_COLOR) return THEMES.none;
+// What the current theme does with colors. noColor (from NO_COLOR, no-color.org) always wins.
+export function resolvePalette(options, noColor = false) {
+  if (noColor) return THEMES.none;
   const theme = THEMES[options.theme];
   if (theme && theme.fixed) return theme;
   return { low: options.low, medium: options.medium, high: options.high, accent: options.accent };

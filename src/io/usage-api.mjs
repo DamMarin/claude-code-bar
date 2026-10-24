@@ -1,10 +1,11 @@
+// Rate limits from the Claude Code OAuth usage API, with the login token
 import { execSync } from "node:child_process";
-import { readFileSync, writeFileSync, mkdirSync, lstatSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { readCacheJson, writeCacheJson } from "./files.mjs";
 
-const CACHE_DIR = join(homedir(), ".cache", "claude-code-bar");
-const CACHE_PATH = join(CACHE_DIR, "usage-cache.json");
+const CACHE_NAME = "usage-cache.json";
 const CACHE_TTL_MS = 60000;
 const FAILURE_TTL_MS = 60000; // missing token, network error, bad response
 const RATE_LIMITED_TTL_MS = 5 * 60000; // HTTP 429
@@ -65,47 +66,11 @@ function resolveToken() {
   return null;
 }
 
-function isValidUsageEntry(entry) {
-  return entry === null || (
-    typeof entry === "object"
-    && typeof entry.percentage === "number"
-    && Number.isFinite(entry.percentage)
-    && entry.resetsAt instanceof Date
-    && !isNaN(entry.resetsAt)
-  );
-}
-
-function isValidExtraUsage(entry) {
-  return entry === null || (
-    typeof entry === "object"
-    && Number.isFinite(entry.percentage)
-    && Number.isFinite(entry.usedCredits)
-    && Number.isFinite(entry.monthlyLimit)
-  );
-}
-
-function isValidCacheData(data) {
-  return data
-    && typeof data === "object"
-    && isValidUsageEntry(data.fiveHour)
-    && isValidUsageEntry(data.sevenDay)
-    && isValidUsageEntry(data.sevenDaySonnet)
-    && isValidExtraUsage(data.extraUsage);
-}
-
-function isSafeToWrite(filePath) {
-  try {
-    const stat = lstatSync(filePath);
-    return !stat.isSymbolicLink();
-  } catch (err) {
-    return err.code === "ENOENT";
-  }
-}
-
 // Returns undefined on a cache miss, null for a cached failure, or the usage data
 function readCache() {
   try {
-    const cache = JSON.parse(readFileSync(CACHE_PATH, "utf8"));
+    const cache = readCacheJson(CACHE_NAME);
+    if (!cache || typeof cache !== "object") return undefined;
     const ttl = Number.isFinite(cache.ttl) ? cache.ttl : CACHE_TTL_MS;
     if (typeof cache.timestamp !== "number" || (Date.now() - cache.timestamp) >= ttl) {
       return undefined;
@@ -126,12 +91,7 @@ function readCache() {
 }
 
 function writeCache(data, ttl = CACHE_TTL_MS) {
-  try {
-    mkdirSync(CACHE_DIR, { recursive: true, mode: 0o700 });
-    if (isSafeToWrite(CACHE_PATH)) {
-      writeFileSync(CACHE_PATH, JSON.stringify({ timestamp: Date.now(), ttl, data }), { mode: 0o600 });
-    }
-  } catch { /* cache write failed */ }
+  writeCacheJson(CACHE_NAME, { timestamp: Date.now(), ttl, data });
 }
 
 // Cache a failure so the API isn't retried on every render

@@ -1,25 +1,22 @@
+// Checks npm for a newer claude-code-bar, at most once a day, in the background
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { spawn } from "node:child_process";
-import { homedir } from "node:os";
 import { join } from "node:path";
+import { compareVersions } from "../core/version.mjs";
+import { CACHE_DIR, readJson } from "./files.mjs";
 
-const CACHE_DIR = join(homedir(), ".cache", "claude-code-bar");
 const CACHE_FILE = join(CACHE_DIR, "update-check.json");
 const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
 const RETRY_INTERVAL_MS = 60 * 60 * 1000; // after a failed or in-flight check
 
-function getPkg() {
+export function getPkg() {
   return JSON.parse(
     readFileSync(new URL("../../package.json", import.meta.url), "utf8")
   );
 }
 
 function readCache() {
-  try {
-    return JSON.parse(readFileSync(CACHE_FILE, "utf8"));
-  } catch {
-    return null;
-  }
+  return readJson(CACHE_FILE) ?? null;
 }
 
 function normalizedLatest(cache) {
@@ -37,47 +34,6 @@ function shouldThrottleScheduledCheck(cache) {
   if (!cache) return false;
   if (normalizedLatest(cache) && isRecent(cache.checkedAt, CHECK_INTERVAL_MS)) return true;
   return isRecent(cache.attemptedAt, RETRY_INTERVAL_MS);
-}
-
-function parseVersion(version) {
-  const match = /^v?(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?(?:\+.*)?$/.exec(version);
-  if (!match) return null;
-  return {
-    core: [Number(match[1]), Number(match[2]), Number(match[3])],
-    pre: match[4] ? match[4].split(".") : [],
-  };
-}
-
-/**
- * Semver precedence: returns a negative number if a < b, positive if a > b, 0 if equal.
- * Returns null if either version cannot be parsed.
- */
-export function compareVersions(a, b) {
-  const va = parseVersion(a);
-  const vb = parseVersion(b);
-  if (!va || !vb) return null;
-
-  for (let i = 0; i < 3; i++) {
-    if (va.core[i] !== vb.core[i]) return va.core[i] - vb.core[i];
-  }
-
-  // A release outranks any of its prereleases
-  if (!va.pre.length || !vb.pre.length) return vb.pre.length - va.pre.length;
-
-  for (let i = 0; i < Math.max(va.pre.length, vb.pre.length); i++) {
-    const x = va.pre[i];
-    const y = vb.pre[i];
-    if (x === undefined) return -1;
-    if (y === undefined) return 1;
-    if (x === y) continue;
-    const xNum = /^\d+$/.test(x);
-    const yNum = /^\d+$/.test(y);
-    if (xNum && yNum) return Number(x) - Number(y);
-    if (xNum) return -1;
-    if (yNum) return 1;
-    return x < y ? -1 : 1;
-  }
-  return 0;
 }
 
 /**
@@ -140,20 +96,4 @@ export function scheduleUpdateCheck() {
     stdio: "ignore",
   });
   child.unref();
-}
-
-/**
- * For --version: prints full update message if available.
- */
-export function printUpdateMessage() {
-  const info = getUpdateInfo();
-  if (info) {
-    const pkg = getPkg();
-    console.log(
-      `\n  Update available: ${info.current} → ${info.latest}\n` +
-        `  Run \`npm install -g ${pkg.name}\` to update.\n`
-    );
-  }
-  // Also trigger a background check for freshness
-  scheduleUpdateCheck();
 }

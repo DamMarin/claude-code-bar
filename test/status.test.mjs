@@ -1,8 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseOptions } from "../src/shared/options.mjs";
-import { renderStatus } from "../src/renderer/status.mjs";
-import { formatCountdown } from "../src/shared/format-reset.mjs";
+import { parseOptions } from "../src/core/options.mjs";
+import { renderStatus } from "../src/core/status.mjs";
+import { formatCountdown } from "../src/core/format-reset.mjs";
 
 const MIN = 60000;
 const ESC = /\x1b\[[0-9;]*m/g;
@@ -27,7 +27,7 @@ function data(overrides = {}) {
   };
 }
 
-const render = (flags, d = data(), env = {}) => renderStatus(d, parseOptions(flags).options, { env });
+const render = (flags, d = data(), noColor = false) => renderStatus(d, parseOptions(flags).options, { noColor });
 
 test("default rendering", () => {
   const { head, rows } = render([]);
@@ -77,8 +77,8 @@ test("themes", () => {
   }
 });
 
-test("NO_COLOR removes every color", () => {
-  const { head, rows } = render(["--theme=ocean"], data(), { NO_COLOR: "1" });
+test("noColor removes every color", () => {
+  const { head, rows } = render(["--theme=ocean"], data(), true);
   assert.doesNotMatch([head, ...rows].join(""), /\x1b/);
 });
 
@@ -92,7 +92,7 @@ test("missing segments and limits are left out", () => {
 });
 
 test("marks underline what a setting affects", () => {
-  const { head } = renderStatus(data(), parseOptions(["--no-color"]).options, { mark: ["git"], env: {} });
+  const { head } = renderStatus(data(), parseOptions(["--no-color"]).options, { mark: ["git"] });
   assert.match(head, /\x1b\[4mmain\*\x1b\[0m/);
 });
 

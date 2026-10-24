@@ -1,10 +1,7 @@
 import { execSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { readFileSync, writeFileSync, mkdirSync, lstatSync } from "node:fs";
-import { homedir } from "node:os";
-import { join } from "node:path";
+import { readCacheJson, writeCacheJson } from "./files.mjs";
 
-const CACHE_DIR = join(homedir(), ".cache", "claude-code-bar");
 const CACHE_TTL_MS = 5000;
 const MAX_BUFFER = 64 * 1024; // 64 KB — plenty for branch names and porcelain output
 const EXEC_OPTS = { encoding: "utf8", timeout: 2000, maxBuffer: MAX_BUFFER, stdio: ["pipe", "pipe", "pipe"] };
@@ -26,32 +23,20 @@ function isValidCache(cache) {
 }
 
 // One cache file per working directory, so concurrent sessions don't evict each other
-function cachePathFor(cwd) {
+function cacheNameFor(cwd) {
   const key = createHash("sha256").update(cwd).digest("hex").slice(0, 16);
-  return join(CACHE_DIR, `git-${key}.json`);
-}
-
-function isSafeToWrite(filePath) {
-  try {
-    const stat = lstatSync(filePath);
-    return !stat.isSymbolicLink();
-  } catch (err) {
-    // ENOENT = file doesn't exist yet, safe to create
-    return err.code === "ENOENT";
-  }
+  return `git-${key}.json`;
 }
 
 export function getGitInfo(cwd) {
   if (typeof cwd !== "string" || cwd.length === 0) return null;
-  const cachePath = cachePathFor(cwd);
+  const cacheName = cacheNameFor(cwd);
 
   // Try cache first
-  try {
-    const cache = JSON.parse(readFileSync(cachePath, "utf8"));
-    if (isValidCache(cache) && cache.cwd === cwd && (Date.now() - cache.timestamp) < CACHE_TTL_MS) {
-      return { branch: cache.branch, dirty: cache.dirty };
-    }
-  } catch { /* no cache or invalid */ }
+  const cache = readCacheJson(cacheName);
+  if (isValidCache(cache) && cache.cwd === cwd && (Date.now() - cache.timestamp) < CACHE_TTL_MS) {
+    return { branch: cache.branch, dirty: cache.dirty };
+  }
 
   // Run git commands
   try {
@@ -70,15 +55,7 @@ export function getGitInfo(cwd) {
 
     const result = { branch, dirty: isDirty };
 
-    // Write cache (skip if path is a symlink)
-    try {
-      mkdirSync(CACHE_DIR, { recursive: true, mode: 0o700 });
-      if (isSafeToWrite(cachePath)) {
-        writeFileSync(cachePath, JSON.stringify({
-          timestamp: Date.now(), cwd, ...result
-        }), { mode: 0o600 });
-      }
-    } catch { /* cache write failed — not critical */ }
+    writeCacheJson(cacheName, { timestamp: Date.now(), cwd, ...result });
 
     return result;
   } catch {

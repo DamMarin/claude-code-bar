@@ -1,6 +1,7 @@
+// Reads and validates the JSON that Claude Code sends on stdin
 const MAX_STDIN_BYTES = 1024 * 1024; // 1 MB
 
-export async function parseStdin() {
+export async function readStdin() {
   if (process.stdin.isTTY) return null;
 
   return new Promise((resolve) => {
@@ -34,4 +35,23 @@ export async function parseStdin() {
     });
     process.stdin.on("error", () => resolve(null));
   });
+}
+
+export function safeString(val, fallback) {
+  return typeof val === "string" && val.length > 0 && val.length < 256 ? val : fallback;
+}
+
+export function safeNumber(val, fallback, min = 0, max = Infinity) {
+  const n = Number(val);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.max(min, Math.min(max, n));
+}
+
+export function parseRateLimit(obj) {
+  if (!obj || typeof obj !== "object") return null;
+  const pct = safeNumber(obj.used_percentage, null, 0, 100);
+  if (pct === null) return null;
+  // Missing reset time stays null (rendered as "?"), not the 1970 epoch
+  const ts = safeNumber(obj.resets_at, 0, 0);
+  return { percentage: pct, resetsAt: ts > 0 ? new Date(ts * 1000) : null };
 }

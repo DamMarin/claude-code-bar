@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { DEFAULT_OPTIONS, parseOptions, serializeOptions } from "../src/shared/options.mjs";
+import { DEFAULT_OPTIONS, parseOptions, serializeOptions } from "../src/core/options.mjs";
 
 test("no flags gives the defaults", () => {
   const { options, errors } = parseOptions([]);
