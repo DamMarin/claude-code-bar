@@ -1,12 +1,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, existsSync, rmSync, symlinkSync, lstatSync, chmodSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, existsSync, rmSync, symlinkSync, lstatSync, chmodSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { basename, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { compareVersions } from "../src/core/version.mjs";
-import { buildCommand, isOwnStatusLine, splitCommand } from "../src/core/status-line.mjs";
+import { buildCommand, commandExecutable, isOwnStatusLine, splitCommand } from "../src/core/status-line.mjs";
 
 const BIN = fileURLToPath(new URL("../bin/claude-code-bar.mjs", import.meta.url));
 const PKG = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
@@ -26,8 +26,8 @@ function makeHome(t) {
   return home;
 }
 
-function run(home, args, input = "") {
-  const env = { ...process.env, HOME: home, USERPROFILE: home };
+function run(home, args, input = "", extraEnv = {}) {
+  const env = { ...process.env, HOME: home, USERPROFILE: home, ...extraEnv };
   delete env.CLAUDE_CODE_OAUTH_TOKEN;
   return spawnSync(process.execPath, [BIN, ...args], { input, env, encoding: "utf8", timeout: 10_000 });
 }
@@ -295,6 +295,13 @@ test("splitCommand keeps quoted paths and shell syntax", () => {
   assert.equal(buildCommand("claude-code-bar", []), "claude-code-bar");
 });
 
+test("commandExecutable finds the program the shell will run", () => {
+  assert.equal(commandExecutable("claude-code-bar --theme=ocean"), "claude-code-bar");
+  assert.equal(commandExecutable("NO_COLOR=1 npx -y claude-code-bar@latest"), "npx");
+  assert.equal(commandExecutable('"/Users/John Doe/bin/claude-code-bar" --hide=dir'), "/Users/John Doe/bin/claude-code-bar");
+  assert.equal(commandExecutable(""), null);
+});
+
 // An executable file, for tests that need a program to exist (or to be on PATH)
 function makeProgram(dir, name) {
   mkdirSync(dir, { recursive: true });
@@ -309,9 +316,39 @@ test("install keeps a quoted program path and a shell suffix", (t) => {
   const program = makeProgram(join(home, "my tools"), "claude-code-bar");
   writeFileSync(settingsPath, JSON.stringify({ statusLine: { type: "command", command: `"${program}" --hide=dir 2>/dev/null` } }));
 
-  const result = run(home, ["--install", "--theme=ocean"]);
+  const result = run(home, ["--install", "--theme=ocean"], "", { PATH: dirname(process.execPath) });
   assert.equal(result.status, 0);
   assert.equal(JSON.parse(readFileSync(settingsPath, "utf8")).statusLine.command, `"${program}" --theme=ocean 2>/dev/null`);
+  assert.doesNotMatch(result.stderr, /not found/);
+});
+
+test("install warns only when the program can't be found", (t) => {
+  const home = makeHome(t);
+  const emptyDir = join(home, "empty-bin");
+  mkdirSync(emptyDir);
+
+  const missing = run(home, ["--install"], "", { PATH: emptyDir });
+  assert.equal(missing.status, 0);
+  assert.match(missing.stderr, /'claude-code-bar' is not found on your PATH/);
+  assert.match(missing.stderr, /npm prefix -g/);
+
+  const binDir = join(home, "bin");
+  makeProgram(binDir, "claude-code-bar");
+  const found = run(home, ["--install"], "", { PATH: binDir });
+  assert.equal(found.status, 0);
+  assert.doesNotMatch(found.stderr, /not found/);
+
+  // Run through node: node has to be found, not claude-code-bar
+  const settingsPath = join(home, ".claude", "settings.json");
+  writeFileSync(settingsPath, JSON.stringify({ statusLine: { type: "command", command: "node /opt/ccb/bin/claude-code-bar.mjs" } }));
+  const viaNode = run(home, ["--install"], "", { PATH: dirname(process.execPath) });
+  assert.equal(viaNode.status, 0);
+  assert.doesNotMatch(viaNode.stderr, /not found/);
+
+  writeFileSync(settingsPath, JSON.stringify({ statusLine: { type: "command", command: "pnpm dlx claude-code-bar@latest" } }));
+  const noPnpm = run(home, ["--install"], "", { PATH: emptyDir });
+  assert.match(noPnpm.stderr, /'pnpm' is not found on your PATH/);
+  assert.doesNotMatch(noPnpm.stderr, /npm prefix -g/);
 });
 
 test("the update check never writes through a symlink in the cache", (t) => {

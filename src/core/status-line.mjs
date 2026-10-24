@@ -7,6 +7,7 @@ export const STATUS_LINE = {
 // The program name as it appears in a command: a path to the bin script, or a package
 // runner spec with a version, e.g. `npx claude-code-bar@latest` or `pnpm dlx claude-code-bar@1.0.0`
 const PROGRAM_TOKEN = /(^|[/\\])claude-code-bar(\.mjs|@[^\s/\\]+)?$/;
+const ENV_ASSIGNMENT = /^[A-Za-z_][A-Za-z0-9_]*=/;
 
 /**
  * Splits a command into words the way a POSIX shell does, so quoted paths with
@@ -84,3 +85,9 @@ export function buildCommand(binary, flags, suffix = "") {
   return [binary, ...flags, suffix].filter(Boolean).join(" ");
 }
 
+// The executable the shell will look for: the first word that is not a VAR=value assignment
+export function commandExecutable(command) {
+  const tokens = tokenize(String(command ?? "").trim());
+  const first = tokens.find((t) => t.shell || !ENV_ASSIGNMENT.test(t.value));
+  return first && !first.shell ? first.value : null;
+}

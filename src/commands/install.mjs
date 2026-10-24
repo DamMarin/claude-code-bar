@@ -1,6 +1,6 @@
-import { execSync } from "node:child_process";
 import { serializeOptions } from "../core/options.mjs";
-import { STATUS_LINE, buildCommand, isOwnStatusLine, splitCommand } from "../core/status-line.mjs";
+import { STATUS_LINE, buildCommand, commandExecutable, isOwnStatusLine, splitCommand } from "../core/status-line.mjs";
+import { canRun } from "../io/executable.mjs";
 import { BACKUP_PATH, SettingsError, readSettings, writeStatusLine } from "../io/settings-file.mjs";
 
 export function warnReplaced(replaced) {
@@ -39,15 +39,17 @@ export async function install(options = null) {
   }
   warnReplaced(replaced);
 
-  // Verify PATH
-  try {
-    execSync("which claude-code-bar", { stdio: "pipe", timeout: 3000 });
-  } catch {
+  // Check that the program the command starts with can be found: claude-code-bar itself,
+  // or e.g. npx, pnpm or node when the command runs it through one of those
+  const program = commandExecutable(command);
+  if (program && !canRun(program)) {
     console.warn(
-      "⚠️  Warning: 'claude-code-bar' is not found on your PATH.\n" +
-      "   Claude Code won't be able to run it.\n" +
-      "   Make sure npm's global bin directory is in your PATH:\n" +
-      `   export PATH="$(npm prefix -g)/bin:$PATH"`
+      `⚠️  Warning: '${program}' is not found ${/[/\\]/.test(program) ? "or is not executable" : "on your PATH"}.\n` +
+      "   Claude Code won't be able to run it." +
+      (program === STATUS_LINE.command
+        ? "\n   Make sure npm's global bin directory is in your PATH:\n" +
+          `   export PATH="$(npm prefix -g)/bin:$PATH"`
+        : "")
     );
   }
 
