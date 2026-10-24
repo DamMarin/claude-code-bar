@@ -1,4 +1,6 @@
-// Rate limits from the Claude Code OAuth usage API, with the login token
+// Rate limits from the Claude Code OAuth usage API, with the login token.
+// The endpoint is not a public, documented API: it can change or disappear without notice.
+// Every failure just hides the limits, and Claude Code's own stdin data is preferred anyway.
 import { execSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readFileSync, statSync } from "node:fs";
@@ -10,6 +12,7 @@ const CACHE_NAME = "usage-cache.json";
 const CACHE_TTL_MS = 60000;
 const FAILURE_TTL_MS = 60000; // missing token, network error, bad response
 const RATE_LIMITED_TTL_MS = 5 * 60000; // HTTP 429
+const GONE_TTL_MS = 60 * 60000; // HTTP 404 or 410: the endpoint may have been removed
 const MAX_RETRY_AFTER_MS = 30 * 60000;
 const MAX_BUFFER = 16 * 1024; // 16 KB — credentials JSON is small
 const EXEC_OPTS = { encoding: "utf8", timeout: 2000, maxBuffer: MAX_BUFFER, stdio: ["pipe", "pipe", "pipe"] };
@@ -128,6 +131,11 @@ function cacheFailure(fingerprint, ttl = FAILURE_TTL_MS) {
   return null;
 }
 
+function failureTtl(res) {
+  if (res.status === 429) return rateLimitedTtl(res);
+  if (res.status === 404 || res.status === 410) return GONE_TTL_MS;
+  return FAILURE_TTL_MS;
+}
 
 function rateLimitedTtl(res) {
   const seconds = Number(res.headers.get("retry-after"));
@@ -188,7 +196,7 @@ export async function fetchUsage() {
 
     if (!res.ok) {
       clearTimeout(timeout);
-      return cacheFailure(fingerprint, res.status === 429 ? rateLimitedTtl(res) : FAILURE_TTL_MS);
+      return cacheFailure(fingerprint, failureTtl(res));
     }
 
     // Guard against oversized responses
