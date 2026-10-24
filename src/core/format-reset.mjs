@@ -18,7 +18,7 @@ export function formatReset(date) {
     return date.toLocaleDateString("en-US", { weekday: "short" });
   }
 
-  // Otherwise → "2d 3h"
+  // Otherwise → "2d3h"
   const days = Math.floor(diffHours / 24);
   const hours = Math.floor(diffHours % 24);
   return `${days}d${hours}h`;
