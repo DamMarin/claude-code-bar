@@ -2,6 +2,7 @@
 import { basename } from "node:path";
 import { DEFAULT_OPTIONS, RATE_LIMITS } from "../core/options.mjs";
 import { renderStatus } from "../core/status.mjs";
+import { stripControl } from "../core/sanitize.mjs";
 import { readStdin, parseRateLimit, safeNumber, safeString } from "../io/stdin.mjs";
 import { getGitInfo } from "../io/git.mjs";
 import { readDefaultModel } from "../io/settings-file.mjs";
@@ -36,16 +37,17 @@ export async function render(options = DEFAULT_OPTIONS) {
     const data = await readStdin();
     if (!data) process.exit(0);
 
-    // Extract with fallbacks and type validation
+    // Extract with fallbacks and type validation. Names that end up on screen are stripped
+    // of control characters, so a folder or model name can't send escape codes to the terminal.
     const hidden = new Set(options.hidden);
     const cwd = safeString(data?.workspace?.current_dir, process.cwd());
     const status = {
-      model: safeString(data?.model?.display_name, null) || safeString(readDefaultModel(), "unknown"),
+      model: stripControl(safeString(data?.model?.display_name, null) || safeString(readDefaultModel(), "unknown")),
       contextPct: safeNumber(data?.context_window?.used_percentage, 0, 0, 100),
       durationMs: safeNumber(data?.cost?.total_duration_ms, 0, 0),
-      dir: basename(cwd),
+      dir: stripControl(basename(cwd)),
       git: hidden.has("git") ? null : getGitInfo(cwd),
-      update: hidden.has("update") ? null : (getUpdateInfo()?.latest ?? null),
+      update: hidden.has("update") ? null : stripControl(getUpdateInfo()?.latest ?? "") || null,
       limits: {},
     };
 

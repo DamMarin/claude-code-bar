@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { parseExtraUsage } from "../src/io/usage-api.mjs";
 import { parseRateLimit } from "../src/io/stdin.mjs";
 import { barCells } from "../src/core/progress-bar.mjs";
+import { stripControl } from "../src/core/sanitize.mjs";
 
 test("parseRateLimit", () => {
   assert.equal(parseRateLimit(null), null);
@@ -59,4 +60,13 @@ test("barCells styles and widths", () => {
   assert.equal(barCells(34, "braille", 10), "⣿⣿⣿⣤⣀⣀⣀⣀⣀⣀");
   assert.equal(barCells(100, "braille", 5), "⣿⣿⣿⣿⣿");
   assert.equal(barCells(50, "unknown", 4), "▓▓░░");
+});
+
+test("stripControl removes escape sequences whole, then control characters", () => {
+  assert.equal(stripControl("\x1b[31mred\x1b[0m"), "red");
+  assert.equal(stripControl("\x1b[1;38;5;196mbold\x1b[m"), "bold");
+  assert.equal(stripControl("a\x1b]0;new title\x07b"), "ab");
+  assert.equal(stripControl("a\x1b]8;;https://example.com\x1b\\link\x1b]8;;\x1b\\b"), "alinkb");
+  assert.equal(stripControl("line\nbreak\ttab\x9bc1"), "linebreaktabc1");
+  assert.equal(stripControl("feature/ünïcödé-🚀"), "feature/ünïcödé-🚀");
 });

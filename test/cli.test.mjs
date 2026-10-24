@@ -363,3 +363,14 @@ test("the update check never writes through a symlink in the cache", (t) => {
   assert.equal(run(home, ["--hide=git,5h,7d,sonnet,extra"], input).status, 0);
   assert.equal(readFileSync(target, "utf8"), "{}");
 });
+
+test("render strips escape codes from the model and folder names", (t) => {
+  const home = makeHome(t);
+  const input = JSON.stringify({
+    model: { display_name: "Op\x1b[31mus\x07 5.5" },
+    workspace: { current_dir: "/tmp/evil\x1b]0;pwned\x07-dir" },
+  });
+  const result = run(home, ["--hide=context,duration,git,update,5h,7d,sonnet,extra", "--no-color"], input);
+  assert.equal(result.status, 0);
+  assert.equal(result.stdout, "🤖 Opus 5.5 │ evil-dir\n");
+});

@@ -1,15 +1,11 @@
 import { execSync } from "node:child_process";
 import { createHash } from "node:crypto";
+import { stripControl } from "../core/sanitize.mjs";
 import { readCacheJson, writeCacheJson } from "./files.mjs";
 
 const CACHE_TTL_MS = 5000;
 const MAX_BUFFER = 64 * 1024; // 64 KB — plenty for branch names; a bigger status just means dirty
 const EXEC_OPTS = { encoding: "utf8", timeout: 2000, maxBuffer: MAX_BUFFER, stdio: ["pipe", "pipe", "pipe"] };
-
-// Strip ANSI escapes and control characters from git output
-function sanitize(str) {
-  return str.replace(/[\x00-\x1f\x7f-\x9f]/g, "").replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "");
-}
 
 function isValidCache(cache) {
   return cache
@@ -50,11 +46,11 @@ export function getGitInfo(cwd) {
 
   // Run git commands
   try {
-    let branch = sanitize(execSync("git branch --show-current", { ...EXEC_OPTS, cwd }).trim());
+    let branch = stripControl(execSync("git branch --show-current", { ...EXEC_OPTS, cwd }).trim());
 
     // Detached HEAD — fall back to short commit hash
     if (!branch) {
-      branch = sanitize(execSync("git rev-parse --short HEAD", { ...EXEC_OPTS, cwd }).trim());
+      branch = stripControl(execSync("git rev-parse --short HEAD", { ...EXEC_OPTS, cwd }).trim());
       if (!branch) return null;
     }
 
