@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, mkdirSync, renameSync, lstatSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, renameSync, lstatSync, realpathSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
@@ -14,11 +14,22 @@ export function isSafeToWrite(filePath) {
   }
 }
 
-// Write to a temp file, then rename, so readers never see a half-written file
+// The file a symlink points to, or the path itself when it is not a link or doesn't exist yet
+function resolveLink(filePath) {
+  try {
+    return realpathSync(filePath);
+  } catch {
+    return filePath;
+  }
+}
+
+// Write to a temp file, then rename, so readers never see a half-written file.
+// A symlinked file (e.g. settings.json kept in a dotfiles repo) is written through, not replaced.
 export function atomicWriteJson(filePath, data) {
-  const tmp = filePath + ".tmp." + process.pid;
+  const target = resolveLink(filePath);
+  const tmp = target + ".tmp." + process.pid;
   writeFileSync(tmp, JSON.stringify(data, null, 2) + "\n", { mode: 0o600 });
-  renameSync(tmp, filePath);
+  renameSync(tmp, target);
 }
 
 // Parsed JSON from a file, or undefined if it is missing or invalid

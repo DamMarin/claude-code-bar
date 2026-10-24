@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, existsSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, existsSync, rmSync, symlinkSync, lstatSync, chmodSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -189,4 +189,47 @@ test("render applies display flags and skips bad ones", (t) => {
   const result = run(home, ["--layout=compact", "--hide=duration,dir", "--no-color", "--bar=bogus"], input);
   assert.equal(result.status, 0);
   assert.equal(result.stdout, "🤖 Opus 5.5 │ 🧠 30% │ 5h 48%\n");
+});
+
+test("render keeps the git branch when the status is too big for the buffer", (t) => {
+  const home = makeHome(t);
+  const cwd = mkdtempSync(join(tmpdir(), "ccb-repo-"));
+  t.after(() => rmSync(cwd, { recursive: true, force: true }));
+  spawnSync("git", ["init", "-q", "-b", "main"], { cwd });
+  // Over 64 KB of `git status --porcelain` output
+  for (let i = 0; i < 2000; i++) writeFileSync(join(cwd, `untracked-file-with-a-long-name-${i}.txt`), "");
+
+  const input = JSON.stringify({ workspace: { current_dir: cwd } });
+  const result = run(home, ["--hide=model,context,duration,dir,update,5h,7d,sonnet,extra", "--no-color"], input);
+  assert.equal(result.status, 0);
+  assert.equal(result.stdout, "main*\n");
+});
+
+test("commands report unexpected errors instead of exiting silently", { skip: process.getuid?.() === 0 && "root can read any file" }, (t) => {
+  const home = makeHome(t);
+  const settingsPath = join(home, ".claude", "settings.json");
+  writeFileSync(settingsPath, "{}");
+  chmodSync(settingsPath, 0o000);
+
+  for (const flag of ["--install", "--uninstall"]) {
+    const result = run(home, [flag]);
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /^❌ Error: EACCES/);
+  }
+});
+
+test("install writes through a symlinked settings.json", (t) => {
+  const home = makeHome(t);
+  const settingsPath = join(home, ".claude", "settings.json");
+  const dotfile = join(home, "dotfiles-settings.json");
+  writeFileSync(dotfile, JSON.stringify({ model: "opus" }));
+  symlinkSync(dotfile, settingsPath);
+
+  assert.equal(run(home, ["--install"]).status, 0);
+  assert.ok(lstatSync(settingsPath).isSymbolicLink());
+  assert.equal(JSON.parse(readFileSync(dotfile, "utf8")).statusLine.command, "claude-code-bar");
+
+  assert.equal(run(home, ["--uninstall"]).status, 0);
+  assert.ok(lstatSync(settingsPath).isSymbolicLink());
+  assert.deepEqual(JSON.parse(readFileSync(dotfile, "utf8")), { model: "opus" });
 });

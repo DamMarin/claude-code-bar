@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { readCacheJson, writeCacheJson } from "./files.mjs";
 
 const CACHE_TTL_MS = 5000;
-const MAX_BUFFER = 64 * 1024; // 64 KB — plenty for branch names and porcelain output
+const MAX_BUFFER = 64 * 1024; // 64 KB — plenty for branch names; a bigger status just means dirty
 const EXEC_OPTS = { encoding: "utf8", timeout: 2000, maxBuffer: MAX_BUFFER, stdio: ["pipe", "pipe", "pipe"] };
 
 // Strip ANSI escapes and control characters from git output
@@ -20,6 +20,16 @@ function isValidCache(cache) {
     && typeof cache.dirty === "boolean"
     && cache.branch.length > 0
     && cache.branch.length < 256;
+}
+
+// A status that overflows the buffer still means there are changes. A timeout counts
+// as clean, so a slow repo loses only the "*", never the branch.
+function isDirty(cwd) {
+  try {
+    return execSync("git status --porcelain", { ...EXEC_OPTS, cwd }).trim().length > 0;
+  } catch (err) {
+    return err.code === "ENOBUFS";
+  }
 }
 
 // One cache file per working directory, so concurrent sessions don't evict each other
@@ -51,9 +61,7 @@ export function getGitInfo(cwd) {
     // Clamp branch name length for display safety
     if (branch.length > 64) branch = branch.slice(0, 61) + "...";
 
-    const isDirty = execSync("git status --porcelain", { ...EXEC_OPTS, cwd }).trim().length > 0;
-
-    const result = { branch, dirty: isDirty };
+    const result = { branch, dirty: isDirty(cwd) };
 
     writeCacheJson(cacheName, { timestamp: Date.now(), cwd, ...result });
 
