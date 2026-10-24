@@ -133,17 +133,60 @@ test("--help and -h print usage", (t) => {
   for (const flag of ["--help", "-h"]) {
     const result = run(home, [flag]);
     assert.equal(result.status, 0);
-    assert.match(result.stdout, new RegExp(`^claude-code-bar ${PKG.version.replace(/\./g, "\\.")}\\n`));
+    assert.match(result.stdout, /^\n █▀▀ █   ▄▀█/); // a blank line above the logo
+    assert.match(result.stdout, new RegExp(`█▀▄  ${PKG.version.replace(/\./g, "\\.")}\\n`));
+    assert.doesNotMatch(result.stdout, /\x1b/); // not a terminal, so no color
     assert.match(result.stdout, /--install/);
     assert.match(result.stdout, /--uninstall/);
   }
 });
 
-test("an unknown option fails with usage on stderr", (t) => {
+test("--install rejects unknown or invalid options", (t) => {
   const home = makeHome(t);
-  const result = run(home, ["--instal"]);
+  for (const [arg, message] of [["--instal", /^Unknown option: --instal\n/], ["--theme=neon", /^--theme: unknown value "neon"/]]) {
+    const result = run(home, ["--install", arg]);
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, message);
+    assert.match(result.stderr, /Usage:/);
+  }
+  assert.ok(!existsSync(join(home, ".claude", "settings.json")));
+});
+
+test("display options are refused outside --install and the status bar", (t) => {
+  const home = makeHome(t);
+  const result = run(home, ["--uninstall", "--theme=ocean"]);
   assert.equal(result.status, 1);
-  assert.equal(result.stdout, "");
-  assert.match(result.stderr, /^Unknown option: --instal\n/);
-  assert.match(result.stderr, /Usage:/);
+  assert.match(result.stderr, /only work with --install/);
+});
+
+test("--install writes display options into the command and reinstall keeps them", (t) => {
+  const home = makeHome(t);
+  const settingsPath = join(home, ".claude", "settings.json");
+  const command = () => JSON.parse(readFileSync(settingsPath, "utf8")).statusLine.command;
+
+  assert.equal(run(home, ["--install", "--hide=dir", "--theme=ocean"]).status, 0);
+  assert.equal(command(), "claude-code-bar --theme=ocean --hide=dir");
+
+  assert.equal(run(home, ["--install"]).status, 0);
+  assert.equal(command(), "claude-code-bar --theme=ocean --hide=dir");
+});
+
+test("--config refuses to run without a terminal", (t) => {
+  const home = makeHome(t);
+  const result = run(home, ["--config"]);
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /needs an interactive terminal/);
+});
+
+test("render applies display flags and skips bad ones", (t) => {
+  const home = makeHome(t);
+  const input = JSON.stringify({
+    model: { display_name: "Opus 5.5" },
+    context_window: { used_percentage: 30 },
+    workspace: { current_dir: "/tmp/demo" },
+    rate_limits: { five_hour: { used_percentage: 48 } },
+  });
+  const result = run(home, ["--layout=compact", "--hide=duration,dir", "--no-color", "--bar=bogus"], input);
+  assert.equal(result.status, 0);
+  assert.equal(result.stdout, "🤖 Opus 5.5 │ 🧠 30% │ 5h 48%\n");
 });

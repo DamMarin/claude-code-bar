@@ -1,9 +1,11 @@
+import { basename } from "node:path";
 import { parseStdin } from "../providers/stdin-parser.mjs";
 import { getGitInfo } from "../providers/git-provider.mjs";
 import { getSettings } from "../providers/settings-provider.mjs";
 import { fetchUsage, parseExtraUsage } from "../providers/oauth-provider.mjs";
 import { getUpdateInfo, scheduleUpdateCheck } from "../cli/update-check.mjs";
-import * as seg from "./segments.mjs";
+import { DEFAULT_OPTIONS, RATE_LIMITS } from "../shared/options.mjs";
+import { renderStatus } from "./status.mjs";
 
 function safeString(val, fallback) {
   return typeof val === "string" && val.length > 0 && val.length < 256 ? val : fallback;
@@ -24,68 +26,64 @@ export function parseRateLimit(obj) {
   return { percentage: pct, resetsAt: ts > 0 ? new Date(ts * 1000) : null };
 }
 
-export async function render() {
+// Rate limits: prefer stdin data, fall back to the OAuth usage API.
+// Nothing is fetched (and no token is read) for limits that are hidden.
+async function loadRateLimits(data, hidden) {
+  if (RATE_LIMITS.every((key) => hidden.has(key))) return {};
+
+  if (data?.rate_limits && typeof data.rate_limits === "object") {
+    const limits = {
+      fiveHour: parseRateLimit(data.rate_limits.five_hour),
+      sevenDay: parseRateLimit(data.rate_limits.seven_day),
+      sevenDaySonnet: parseRateLimit(data.rate_limits.seven_day_sonnet),
+      extraUsage: parseExtraUsage(data.rate_limits.extra_usage),
+    };
+    // Stdin doesn't always include rich extra_usage fields — fill from OAuth.
+    if (!limits.extraUsage && !hidden.has("extra")) {
+      const oauth = await fetchUsage();
+      if (oauth?.extraUsage) limits.extraUsage = oauth.extraUsage;
+    }
+    return limits;
+  }
+
+  return (await fetchUsage()) ?? {};
+}
+
+export async function render(options = DEFAULT_OPTIONS) {
   try {
     const data = await parseStdin();
     if (!data) process.exit(0);
 
     // Extract with fallbacks and type validation
+    const hidden = new Set(options.hidden);
     const settings = getSettings();
-    const model = safeString(data?.model?.display_name, null)
-      || safeString(settings.model, "unknown");
-    const ctxPct = safeNumber(data?.context_window?.used_percentage, 0, 0, 100);
     const cwd = safeString(data?.workspace?.current_dir, process.cwd());
-    const durationMs = safeNumber(data?.cost?.total_duration_ms, 0, 0);
-    const gitInfo = getGitInfo(cwd);
+    const status = {
+      model: safeString(data?.model?.display_name, null) || safeString(settings.model, "unknown"),
+      contextPct: safeNumber(data?.context_window?.used_percentage, 0, 0, 100),
+      durationMs: safeNumber(data?.cost?.total_duration_ms, 0, 0),
+      dir: basename(cwd),
+      git: hidden.has("git") ? null : getGitInfo(cwd),
+      update: hidden.has("update") ? null : (getUpdateInfo()?.latest ?? null),
+      limits: {},
+    };
 
-    const updateInfo = getUpdateInfo();
-
-    const parts = [
-      seg.modelSegment(model),
-      seg.contextSegment(ctxPct),
-      seg.durationSegment(durationMs),
-      seg.directorySegment(cwd),
-      seg.gitSegment(gitInfo),
-      updateInfo ? seg.updateSegment(updateInfo.latest) : null,
-    ].filter(Boolean);
-
-    // Trigger background check for next time
-    scheduleUpdateCheck();
-
-    console.log(parts.join(" │ "));
-
-    // Rate limits: prefer stdin data, fallback to OAuth
-    let rateLimits = null;
-
-    if (data?.rate_limits && typeof data.rate_limits === "object") {
-      rateLimits = {
-        fiveHour: parseRateLimit(data.rate_limits.five_hour),
-        sevenDay: parseRateLimit(data.rate_limits.seven_day),
-        sevenDaySonnet: parseRateLimit(data.rate_limits.seven_day_sonnet),
-        extraUsage: parseExtraUsage(data.rate_limits.extra_usage),
-      };
-      // Stdin doesn't always include rich extra_usage fields — fill from OAuth.
-      if (!rateLimits.extraUsage) {
-        const oauth = await fetchUsage();
-        if (oauth?.extraUsage) rateLimits.extraUsage = oauth.extraUsage;
-      }
-    } else {
-      rateLimits = await fetchUsage();
+    if (!hidden.has("update")) {
+      // Trigger background check for next time
+      scheduleUpdateCheck();
     }
 
-    if (rateLimits?.fiveHour) {
-      console.log(seg.rateLimitSegment("⏱️ 5h", rateLimits.fiveHour.percentage, rateLimits.fiveHour.resetsAt));
-    }
-    if (rateLimits?.sevenDay) {
-      console.log(seg.rateLimitSegment("📅 7d", rateLimits.sevenDay.percentage, rateLimits.sevenDay.resetsAt));
-    }
-    if (rateLimits?.sevenDaySonnet) {
-      console.log(seg.rateLimitSegment("📜 S", rateLimits.sevenDaySonnet.percentage, rateLimits.sevenDaySonnet.resetsAt));
-    }
-    if (rateLimits?.extraUsage && rateLimits.extraUsage.monthlyLimit > 0) {
-      console.log(seg.extraUsageSegment(rateLimits.extraUsage));
+    // Print the first line before any network call, so a slow API never blanks the bar
+    const compact = options.layout === "compact";
+    if (!compact) {
+      const { head } = renderStatus(status, options);
+      if (head) console.log(head);
     }
 
+    status.limits = await loadRateLimits(data, hidden);
+    const { head, rows } = renderStatus(status, options);
+    if (compact && head) console.log(head);
+    for (const row of rows) console.log(row);
   } catch {
     // Never crash, never print errors to stdout
     process.exit(0);

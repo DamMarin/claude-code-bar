@@ -2,7 +2,11 @@ import { readFileSync, writeFileSync, mkdirSync, renameSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { STATUS_LINE, BACKUP_PATH, isOwnStatusLine } from "./status-line.mjs";
+import { STATUS_LINE, BACKUP_PATH, isOwnStatusLine, splitCommand } from "./status-line.mjs";
+import { serializeOptions } from "../shared/options.mjs";
+
+const CLAUDE_DIR = join(homedir(), ".claude");
+export const SETTINGS_PATH = join(CLAUDE_DIR, "settings.json");
 
 function atomicWriteJson(filePath, data) {
   const tmp = filePath + ".tmp." + process.pid;
@@ -10,51 +14,72 @@ function atomicWriteJson(filePath, data) {
   renameSync(tmp, filePath);
 }
 
-export async function install() {
-  const claudeDir = join(homedir(), ".claude");
-  const settingsPath = join(claudeDir, "settings.json");
-
-  // Ensure ~/.claude/ exists
-  mkdirSync(claudeDir, { recursive: true });
-
-  // Read existing settings
-  let settings = {};
+// Reads ~/.claude/settings.json; exits with a message if it cannot be used safely
+export function readSettings() {
   try {
-    const raw = readFileSync(settingsPath, "utf8");
-    settings = JSON.parse(raw);
+    const settings = JSON.parse(readFileSync(SETTINGS_PATH, "utf8"));
     if (typeof settings !== "object" || Array.isArray(settings) || settings === null) {
-      console.error("❌ Error: ~/.claude/settings.json is not a JSON object. Fix it manually before installing.");
+      console.error("❌ Error: ~/.claude/settings.json is not a JSON object. Fix it manually first.");
       process.exit(1);
     }
+    return settings;
   } catch (err) {
-    if (err.code === "ENOENT") {
-      // File doesn't exist — start fresh
-      settings = {};
-    } else if (err instanceof SyntaxError) {
-      console.error("❌ Error: ~/.claude/settings.json contains invalid JSON. Fix it manually before installing.");
+    if (err.code === "ENOENT") return {};
+    if (err instanceof SyntaxError) {
+      console.error("❌ Error: ~/.claude/settings.json contains invalid JSON. Fix it manually first.");
       process.exit(1);
-    } else {
-      throw err;
     }
+    throw err;
   }
+}
 
-  // Back up a statusLine from another tool before replacing it
+/**
+ * Sets the statusLine command. A statusLine from another tool is backed up first,
+ * so --uninstall can restore it. Returns that replaced statusLine, or null.
+ */
+export function writeStatusLine(command) {
+  mkdirSync(CLAUDE_DIR, { recursive: true });
+  const settings = readSettings();
+
   const existing = settings.statusLine;
-  if (existing !== undefined && !isOwnStatusLine(existing)) {
-    atomicWriteJson(BACKUP_PATH, { statusLine: existing, savedAt: new Date().toISOString() });
-    const described = typeof existing?.command === "string" ? `"${existing.command}"` : "(custom config)";
-    console.warn(
-      `⚠️  Replacing your existing statusLine ${described}.\n` +
-      `   A copy was saved to ${BACKUP_PATH}\n` +
-      "   and will be restored by `claude-code-bar --uninstall`."
-    );
+  const replaced = existing !== undefined && !isOwnStatusLine(existing) ? existing : null;
+  if (replaced !== null) {
+    atomicWriteJson(BACKUP_PATH, { statusLine: replaced, savedAt: new Date().toISOString() });
   }
 
-  // Set statusLine config
-  settings.statusLine = { ...STATUS_LINE };
-
+  settings.statusLine = { ...STATUS_LINE, command };
   // Atomic write: write to temp file, then rename
-  atomicWriteJson(settingsPath, settings);
+  atomicWriteJson(SETTINGS_PATH, settings);
+  return replaced;
+}
+
+export function warnReplaced(replaced) {
+  if (replaced === null) return;
+  const described = typeof replaced?.command === "string" ? `"${replaced.command}"` : "(custom config)";
+  console.warn(
+    `⚠️  Replaced your existing statusLine ${described}.\n` +
+    `   A copy was saved to ${BACKUP_PATH}\n` +
+    "   and will be restored by `claude-code-bar --uninstall`."
+  );
+}
+
+/**
+ * options: display options passed with --install, or null to keep the current ones.
+ */
+export async function install(options = null) {
+  const existing = readSettings().statusLine;
+  const ours = isOwnStatusLine(existing);
+  let command = STATUS_LINE.command;
+  if (options) {
+    // Keep a custom program path the user may have set, e.g. /opt/bin/claude-code-bar
+    const binary = ours ? splitCommand(existing.command).binary : STATUS_LINE.command;
+    command = [binary, ...serializeOptions(options)].join(" ");
+  } else if (ours) {
+    // Reinstalling keeps the options chosen earlier
+    command = existing.command;
+  }
+
+  warnReplaced(writeStatusLine(command));
 
   // Verify PATH
   try {
@@ -69,5 +94,7 @@ export async function install() {
   }
 
   console.log("✅ Claude Code Bar installed successfully.");
+  if (command !== STATUS_LINE.command) console.log(`   Command: ${command}`);
   console.log("   Restart Claude Code to activate.");
+  console.log("   Run `claude-code-bar --config` to choose what to show.");
 }

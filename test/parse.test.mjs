@@ -2,8 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { parseExtraUsage } from "../src/providers/oauth-provider.mjs";
 import { parseRateLimit } from "../src/renderer/bar-builder.mjs";
-import { renderBar } from "../src/renderer/progress-bar.mjs";
-import { COLORS } from "../src/shared/colors.mjs";
+import { barCells } from "../src/renderer/progress-bar.mjs";
 
 test("parseRateLimit", () => {
   assert.equal(parseRateLimit(null), null);
@@ -46,11 +45,18 @@ test("parseExtraUsage derives and clamps the percentage", () => {
   assert.equal(negative.currency, null);
 });
 
-test("renderBar colors and clamps", () => {
-  assert.equal(renderBar(48), `${COLORS.green}▓▓▓▓▓░░░░░ 48%${COLORS.reset}`);
-  assert.equal(renderBar(50), `${COLORS.yellow}▓▓▓▓▓░░░░░ 50%${COLORS.reset}`);
-  assert.equal(renderBar(80), `${COLORS.red}▓▓▓▓▓▓▓▓░░ 80%${COLORS.reset}`);
-  assert.equal(renderBar(150), `${COLORS.red}▓▓▓▓▓▓▓▓▓▓ 100%${COLORS.reset}`);
-  assert.equal(renderBar(-5), `${COLORS.green}░░░░░░░░░░ 0%${COLORS.reset}`);
-  assert.equal(renderBar(NaN), `${COLORS.green}░░░░░░░░░░ 0%${COLORS.reset}`);
+test("barCells fills and clamps", () => {
+  assert.equal(barCells(48), "▓▓▓▓▓░░░░░");
+  assert.equal(barCells(80), "▓▓▓▓▓▓▓▓░░");
+  assert.equal(barCells(150), "▓▓▓▓▓▓▓▓▓▓");
+  assert.equal(barCells(-5), "░░░░░░░░░░");
+  assert.equal(barCells(NaN), "░░░░░░░░░░");
+});
+
+test("barCells styles and widths", () => {
+  assert.equal(barCells(50, "dots", 4), "●●○○");
+  assert.equal(barCells(50, "line", 6), "━━━───");
+  assert.equal(barCells(34, "braille", 10), "⣿⣿⣿⣤⣀⣀⣀⣀⣀⣀");
+  assert.equal(barCells(100, "braille", 5), "⣿⣿⣿⣿⣿");
+  assert.equal(barCells(50, "unknown", 4), "▓▓░░");
 });

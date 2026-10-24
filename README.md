@@ -2,7 +2,7 @@
 
 Never lose track of Claude Code context usage, rate limits, and git state - all in your terminal.
 
-> No dependencies. No config. Just drop it in.
+> No dependencies. No config needed. Just drop it in.
 
 
 ```text
@@ -52,6 +52,41 @@ All in one clean status bar.
 * Git branch and dirty indicator
 * Session duration
 * Model name
+* Themes, bar styles and a one-line layout — pick them in an interactive menu
+
+---
+
+## 🎨 Customize
+
+```bash
+claude-code-bar --config
+```
+
+An interactive menu in your terminal, with a live preview. Choose which segments to show and in what order, a theme (Default, Colorblind, Ocean, High contrast, Mono, None or your own colors), the bar style and width, and a multi-line or one-line layout. Press `enter` to save.
+
+Your choices are stored as flags in the `statusLine` command, so you can also set them by hand:
+
+```json
+"command": "claude-code-bar --theme=ocean --hide=dir --bar=braille --reset=countdown"
+```
+
+| Option | What it does |
+| --- | --- |
+| `--theme=<name>` | `default`, `colorblind`, `ocean`, `high-contrast`, `mono`, `none` |
+| `--colors=<role:color,…>` | Your own colors for `low`, `medium`, `high` and `accent`, from the 16 terminal colors |
+| `--thresholds=<m>,<h>` | Where colors switch to medium and high (default `50,80`) |
+| `--hide=<names>` | Hide `model`, `context`, `duration`, `dir`, `git`, `update`, `5h`, `7d`, `sonnet`, `extra` |
+| `--order=<names>` | Order of the first line, e.g. `git,model,context` |
+| `--layout=compact` | Everything on one line, without bars |
+| `--bar=<style>` | `shade` ▓░, `block` █░, `line` ━─, `dots` ●○, `squares` ■□, `braille` ⣿⣀ |
+| `--bar-width=<n>` | Bar width in characters (default `10`) |
+| `--separator=<name>` | `pipe` │, `dot` ·, `slash` /, `arrow` › |
+| `--show=left` | Show what is left instead of what is used |
+| `--reset=countdown` | `in 2h10m` instead of `resets 14:30` |
+| `--no-emoji` | Text labels instead of emoji |
+| `--no-color` | No colors. `NO_COLOR` is respected too |
+
+Options also work with `--install`, e.g. `claude-code-bar --install --theme=ocean`. When every rate limit is hidden, claude-code-bar never reads your login token.
 
 ---
 
