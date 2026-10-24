@@ -9,7 +9,7 @@ Never lose track of Claude Code context usage, rate limits, and git state - all 
 🤖 Sonnet 4.6 │ 🧠 30% │ ⏱️ 2m14s │ my-project │ main*
 ⏱️ 5h  ▓▓▓▓▓░░░░░ 48%  resets 14:30
 📅 7d  ▓▓░░░░░░░░ 21%  resets Thu
-📜 S   ▓░░░░░░░░░ 5%   resets Sun
+📜 S   ▓░░░░░░░░░ 5%  resets Sun
 💰 Extra  ▓▓░░░░░░░░ 18%  €15.60 / €85
 ```
 
@@ -23,6 +23,10 @@ claude-code-bar --install
 ```
 
 Restart Claude Code — you're done.
+
+Want a different look? Run `claude-code-bar --config` to pick a theme, the segments and the layout in an interactive menu.
+
+If you already had a `statusLine` from another tool, `--install` saves a copy of it and `--uninstall` puts it back.
 
 ---
 
@@ -62,7 +66,26 @@ All in one clean status bar.
 claude-code-bar --config
 ```
 
-An interactive menu in your terminal, with a live preview. Choose which segments to show and in what order, a theme (Default, Colorblind, Ocean, High contrast, Mono, None or your own colors), the bar style and width, and a multi-line or one-line layout. Press `enter` to save.
+An interactive menu in your terminal, with a live preview. Choose which segments to show and in what order, a theme (Default, Colorblind, Ocean, High contrast, Mono, None or your own colors), the bar style and width, and a multi-line or one-line layout.
+
+| Key | Action |
+| --- | --- |
+| `↑` `↓` | Move between settings |
+| `tab` or `1`–`4` | Switch between Segments, Theme, Bar and Layout |
+| `space` | Show or hide a segment, use a theme |
+| `←` `→` | Change a value |
+| `m` | Move a segment, then `↑` `↓` and `enter` to drop it |
+| `r` / `R` | Reset one setting / all settings |
+| `enter` | Save to `~/.claude/settings.json` |
+| `esc` | Quit (asks first if you have unsaved changes) |
+
+The preview underlines whatever the focused setting changes, and moving over a theme previews it before you choose it. Restart Claude Code after saving.
+
+For example, `--layout=compact` puts everything on one line:
+
+```text
+🤖 Sonnet 4.6 │ 🧠 30% │ ⏱️ 2m14s │ my-project │ main* │ 5h 48%  7d 21%  S 5%  💰 €15.60/€85
+```
 
 Your choices are stored as flags in the `statusLine` command, so you can also set them by hand:
 
@@ -86,7 +109,7 @@ Your choices are stored as flags in the `statusLine` command, so you can also se
 | `--no-emoji` | Text labels instead of emoji |
 | `--no-color` | No colors. `NO_COLOR` is respected too |
 
-Options also work with `--install`, e.g. `claude-code-bar --install --theme=ocean`. When every rate limit is hidden, claude-code-bar never reads your login token.
+Options also work with `--install`, e.g. `claude-code-bar --install --theme=ocean`. Running `--install` again without options keeps the ones you have. See all options with `claude-code-bar --help`.
 
 ---
 
@@ -98,9 +121,13 @@ The tool:
 
 1. Parses Claude’s runtime state
 2. Enriches missing data (rate limits, git)
-3. Renders a compact status bar
+3. Renders the status bar with your display options
 
-If rate limit data is missing, it fetches it using your Claude Code OAuth token (cached briefly).
+### Network and credentials
+
+* **Rate limits.** When Claude Code doesn't send rate limit data, claude-code-bar fetches it from `api.anthropic.com/api/oauth/usage` with your Claude Code login token. It reads the token from `CLAUDE_CODE_OAUTH_TOKEN`, the macOS Keychain, `~/.claude/.credentials.json` or the Linux secret store, and sends it nowhere else. Results are cached for a minute. Failures are cached too, so it never retries on every refresh: a minute normally, longer when the API says it is rate limited. Hide every rate limit (`--hide=5h,7d,sonnet,extra`) and the token is never read.
+* **Updates.** Once a day it asks `registry.npmjs.org` for the latest version, in the background. Hide the update notice (`--hide=update`) to turn this off.
+
 ---
 
 ## 🛠 Manual setup
@@ -118,6 +145,8 @@ If you prefer manual configuration:
 ```
 
 File: `~/.claude/settings.json`
+
+Add [display options](#-customize) to `command`, e.g. `"claude-code-bar --theme=ocean --no-emoji"`.
 
 ---
 
@@ -142,6 +171,8 @@ claude-code-bar --uninstall
 npm uninstall -g claude-code-bar
 ```
 
+`--uninstall` removes only claude-code-bar's `statusLine`, never another tool's, and restores the one `--install` replaced.
+
 ---
 
 ## 🧪 Requirements
@@ -162,6 +193,19 @@ Ensure your global npm bin directory is in your PATH.
 * Restart Claude Code
 * Verify `~/.claude/settings.json` contains the `statusLine` command
 
+### An option has no effect
+
+The status bar skips options it doesn't understand, so a typo never blanks it. To find the typo, run the command from `settings.json` by hand in a terminal:
+
+```bash
+claude-code-bar --theme=ocen --hide=dir
+# --theme: unknown value "ocen". Use: default, colorblind, ocean, high-contrast, mono, none
+```
+
+### `--config` says it needs an interactive terminal
+
+Run it directly in Terminal, iTerm or a similar app, not through a pipe or a script. To set options without the menu, use `claude-code-bar --install` with options.
+
 ---
 
 ## 🔒 Safety
@@ -170,12 +214,20 @@ Ensure your global npm bin directory is in your PATH.
 * Never crashes or prints errors to stdout
 * Input is validated and bounded
 * 5-second hard timeout
+* A mistyped option is skipped, never breaks the bar
+* `NO_COLOR` is respected
 
 ---
 
 ## 📦 Versioning
 
-This project follows [ZeroVer](https://0ver.org/) (0-based versioning).
+This project follows [Semantic Versioning](https://semver.org/), starting with 1.0.0. Earlier releases (0.0.x) followed [ZeroVer](https://0ver.org/).
+
+* **Major** (2.0.0): breaking changes, such as a removed or renamed option
+* **Minor** (1.1.0): new features, such as a new option or theme
+* **Patch** (1.0.1): bug fixes
+
+The public API is the set of commands (`--install`, `--uninstall`, `--config`, `--version`, `--help`) and display options. Removing or changing the meaning of one of them is a major release.
 
 ---
 
@@ -190,7 +242,7 @@ Tests use the built-in `node --test` runner — still zero dependencies. CI runs
 ### Releasing
 
 ```bash
-npm version patch   # runs the tests, bumps package.json, commits and tags vX.Y.Z
+npm version patch   # or minor / major; runs the tests, bumps package.json, commits and tags vX.Y.Z
 git push --follow-tags
 ```
 
