@@ -235,14 +235,17 @@ The public API is the set of commands (`--install`, `--uninstall`, `--config`, `
 
 ```bash
 npm test
+npm run lint
 ```
 
 Tests use the built-in `node --test` runner — still zero dependencies. CI runs them on Node 22, 24 and 26, on Linux and macOS.
 
+Linting uses [oxlint](https://oxc.rs/docs/guide/usage/linter.html) with its `correctness` and `suspicious` rules (see `.oxlintrc.json`). It runs through `npx` at a pinned version, so it is not a dependency either: nothing is added to `package.json` and there is no lockfile. To upgrade it, change the version in the `lint` script.
+
 ### Releasing
 
 ```bash
-npm version patch   # or minor / major; runs the tests, bumps package.json, commits and tags vX.Y.Z
+npm version patch   # or minor / major; runs the linter and tests, bumps package.json, commits and tags vX.Y.Z
 git push --follow-tags
 ```
 
