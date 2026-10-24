@@ -3,7 +3,6 @@
   "version": "1.0.0",
   "description": "Real-time status bar for Claude Code showing context usage, rate limits, and git state",
   "type": "module",
-  "exports": null,
   "bin": {
     "claude-code-bar": "bin/claude-code-bar.mjs"
   },
@@ -23,7 +22,6 @@
     "cli",
     "terminal",
     "status-line",
-    "status-bar",
     "developer-tools",
     "productivity",
     "ai",
