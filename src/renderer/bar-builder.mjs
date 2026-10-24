@@ -15,7 +15,7 @@ function safeNumber(val, fallback, min = 0, max = Infinity) {
   return Math.max(min, Math.min(max, n));
 }
 
-function parseRateLimit(obj) {
+export function parseRateLimit(obj) {
   if (!obj || typeof obj !== "object") return null;
   const pct = safeNumber(obj.used_percentage, null, 0, 100);
   if (pct === null) return null;
