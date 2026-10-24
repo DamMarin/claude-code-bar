@@ -1,11 +1,24 @@
-import { readFileSync, writeFileSync, renameSync } from "node:fs";
+import { readFileSync, writeFileSync, renameSync, unlinkSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { BACKUP_PATH, isOwnStatusLine } from "./status-line.mjs";
 
 function atomicWriteJson(filePath, data) {
   const tmp = filePath + ".tmp." + process.pid;
   writeFileSync(tmp, JSON.stringify(data, null, 2) + "\n", { mode: 0o600 });
   renameSync(tmp, filePath);
+}
+
+// Returns the statusLine saved by --install, or null if there is no usable backup
+function readBackup() {
+  try {
+    const backup = JSON.parse(readFileSync(BACKUP_PATH, "utf8"));
+    const statusLine = backup?.statusLine;
+    if (statusLine === null || typeof statusLine !== "object" || Array.isArray(statusLine)) return null;
+    return statusLine;
+  } catch {
+    return null;
+  }
 }
 
 export async function uninstall() {
@@ -31,12 +44,33 @@ export async function uninstall() {
     }
   }
 
-  delete settings.statusLine;
+  if (settings.statusLine === undefined) {
+    console.log("Nothing to uninstall — no statusLine is configured.");
+    process.exit(0);
+  }
+
+  // Never remove a statusLine that belongs to another tool
+  if (!isOwnStatusLine(settings.statusLine)) {
+    console.log("Nothing to uninstall — the configured statusLine is not claude-code-bar. Leaving it untouched.");
+    process.exit(0);
+  }
+
+  const backup = readBackup();
+  if (backup) {
+    settings.statusLine = backup;
+  } else {
+    delete settings.statusLine;
+  }
 
   // Atomic write: write to temp file, then rename
   atomicWriteJson(settingsPath, settings);
 
-  console.log("✅ Claude Code Bar uninstalled.");
+  if (backup) {
+    try { unlinkSync(BACKUP_PATH); } catch { /* already gone */ }
+    console.log("✅ Claude Code Bar uninstalled. Your previous statusLine was restored.");
+  } else {
+    console.log("✅ Claude Code Bar uninstalled.");
+  }
   console.log("   Restart Claude Code to apply.");
   console.log("   To also remove the package: npm uninstall -g claude-code-bar");
 }

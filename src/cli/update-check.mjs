@@ -6,6 +6,7 @@ import { join } from "node:path";
 const CACHE_DIR = join(homedir(), ".cache", "claude-code-bar");
 const CACHE_FILE = join(CACHE_DIR, "update-check.json");
 const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
+const RETRY_INTERVAL_MS = 60 * 60 * 1000; // after a failed or in-flight check
 
 function getPkg() {
   return JSON.parse(
@@ -26,15 +27,61 @@ function normalizedLatest(cache) {
   return cache.latest.trim();
 }
 
+function isRecent(timestamp, intervalMs) {
+  return typeof timestamp === "number"
+    && Number.isFinite(timestamp)
+    && Date.now() - timestamp < intervalMs;
+}
+
 function shouldThrottleScheduledCheck(cache) {
-  if (!normalizedLatest(cache)) return false;
-  const { checkedAt } = cache;
-  if (typeof checkedAt !== "number" || !Number.isFinite(checkedAt)) return false;
-  return Date.now() - checkedAt < CHECK_INTERVAL_MS;
+  if (!cache) return false;
+  if (normalizedLatest(cache) && isRecent(cache.checkedAt, CHECK_INTERVAL_MS)) return true;
+  return isRecent(cache.attemptedAt, RETRY_INTERVAL_MS);
+}
+
+function parseVersion(version) {
+  const match = /^v?(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?(?:\+.*)?$/.exec(version);
+  if (!match) return null;
+  return {
+    core: [Number(match[1]), Number(match[2]), Number(match[3])],
+    pre: match[4] ? match[4].split(".") : [],
+  };
 }
 
 /**
- * Returns { current, latest } if an update is available, null otherwise.
+ * Semver precedence: returns a negative number if a < b, positive if a > b, 0 if equal.
+ * Returns null if either version cannot be parsed.
+ */
+export function compareVersions(a, b) {
+  const va = parseVersion(a);
+  const vb = parseVersion(b);
+  if (!va || !vb) return null;
+
+  for (let i = 0; i < 3; i++) {
+    if (va.core[i] !== vb.core[i]) return va.core[i] - vb.core[i];
+  }
+
+  // A release outranks any of its prereleases
+  if (!va.pre.length || !vb.pre.length) return vb.pre.length - va.pre.length;
+
+  for (let i = 0; i < Math.max(va.pre.length, vb.pre.length); i++) {
+    const x = va.pre[i];
+    const y = vb.pre[i];
+    if (x === undefined) return -1;
+    if (y === undefined) return 1;
+    if (x === y) continue;
+    const xNum = /^\d+$/.test(x);
+    const yNum = /^\d+$/.test(y);
+    if (xNum && yNum) return Number(x) - Number(y);
+    if (xNum) return -1;
+    if (yNum) return 1;
+    return x < y ? -1 : 1;
+  }
+  return 0;
+}
+
+/**
+ * Returns { current, latest } if a newer version is published, null otherwise.
  */
 export function getUpdateInfo() {
   const cache = readCache();
@@ -42,7 +89,7 @@ export function getUpdateInfo() {
   if (!latest) return null;
 
   const pkg = getPkg();
-  if (latest !== pkg.version) {
+  if (compareVersions(latest, pkg.version) > 0) {
     return { current: pkg.version, latest };
   }
   return null;
@@ -50,11 +97,20 @@ export function getUpdateInfo() {
 
 /**
  * Spawns a detached background process to check npm for updates.
- * Skips if a complete cache (valid latest + checkedAt) is fresher than 24 hours.
+ * Skips if the last successful check is fresher than 24 hours, or if a check
+ * was attempted within the last hour (so failures don't retry on every render).
  */
 export function scheduleUpdateCheck() {
   const cache = readCache();
   if (shouldThrottleScheduledCheck(cache)) return;
+
+  // Record the attempt before spawning, so concurrent renders don't spawn too
+  try {
+    mkdirSync(CACHE_DIR, { recursive: true, mode: 0o700 });
+    writeFileSync(CACHE_FILE, JSON.stringify({ ...cache, attemptedAt: Date.now() }));
+  } catch {
+    return;
+  }
 
   const pkg = getPkg();
   const script = `
@@ -69,6 +125,7 @@ export function scheduleUpdateCheck() {
         clearTimeout(timeout);
         if (!res.ok) process.exit(0);
         const data = await res.json();
+        if (typeof data.version !== "string") process.exit(0);
         mkdirSync(${JSON.stringify(CACHE_DIR)}, { recursive: true });
         writeFileSync(${JSON.stringify(CACHE_FILE)}, JSON.stringify({
           latest: data.version,

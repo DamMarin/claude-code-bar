@@ -19,8 +19,9 @@ function parseRateLimit(obj) {
   if (!obj || typeof obj !== "object") return null;
   const pct = safeNumber(obj.used_percentage, null, 0, 100);
   if (pct === null) return null;
+  // Missing reset time stays null (rendered as "?"), not the 1970 epoch
   const ts = safeNumber(obj.resets_at, 0, 0);
-  return { percentage: pct, resetsAt: new Date(ts * 1000) };
+  return { percentage: pct, resetsAt: ts > 0 ? new Date(ts * 1000) : null };
 }
 
 export async function render() {

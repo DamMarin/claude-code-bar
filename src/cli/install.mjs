@@ -2,6 +2,7 @@ import { readFileSync, writeFileSync, mkdirSync, renameSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { STATUS_LINE, BACKUP_PATH, isOwnStatusLine } from "./status-line.mjs";
 
 function atomicWriteJson(filePath, data) {
   const tmp = filePath + ".tmp." + process.pid;
@@ -37,12 +38,20 @@ export async function install() {
     }
   }
 
+  // Back up a statusLine from another tool before replacing it
+  const existing = settings.statusLine;
+  if (existing !== undefined && !isOwnStatusLine(existing)) {
+    atomicWriteJson(BACKUP_PATH, { statusLine: existing, savedAt: new Date().toISOString() });
+    const described = typeof existing?.command === "string" ? `"${existing.command}"` : "(custom config)";
+    console.warn(
+      `⚠️  Replacing your existing statusLine ${described}.\n` +
+      `   A copy was saved to ${BACKUP_PATH}\n` +
+      "   and will be restored by `claude-code-bar --uninstall`."
+    );
+  }
+
   // Set statusLine config
-  settings.statusLine = {
-    type: "command",
-    command: "claude-code-bar",
-    padding: 0,
-  };
+  settings.statusLine = { ...STATUS_LINE };
 
   // Atomic write: write to temp file, then rename
   atomicWriteJson(settingsPath, settings);

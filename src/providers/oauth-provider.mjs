@@ -6,6 +6,9 @@ import { join } from "node:path";
 const CACHE_DIR = join(homedir(), ".cache", "claude-code-bar");
 const CACHE_PATH = join(CACHE_DIR, "usage-cache.json");
 const CACHE_TTL_MS = 60000;
+const FAILURE_TTL_MS = 60000; // missing token, network error, bad response
+const RATE_LIMITED_TTL_MS = 5 * 60000; // HTTP 429
+const MAX_RETRY_AFTER_MS = 30 * 60000;
 const MAX_BUFFER = 16 * 1024; // 16 KB — credentials JSON is small
 const EXEC_OPTS = { encoding: "utf8", timeout: 2000, maxBuffer: MAX_BUFFER, stdio: ["pipe", "pipe", "pipe"] };
 const MAX_RESPONSE_BYTES = 64 * 1024; // 64 KB — reject oversized API responses
@@ -99,15 +102,18 @@ function isSafeToWrite(filePath) {
   }
 }
 
+// Returns undefined on a cache miss, null for a cached failure, or the usage data
 function readCache() {
   try {
     const cache = JSON.parse(readFileSync(CACHE_PATH, "utf8"));
-    if (typeof cache.timestamp !== "number" || (Date.now() - cache.timestamp) >= CACHE_TTL_MS) {
-      return null;
+    const ttl = Number.isFinite(cache.ttl) ? cache.ttl : CACHE_TTL_MS;
+    if (typeof cache.timestamp !== "number" || (Date.now() - cache.timestamp) >= ttl) {
+      return undefined;
     }
     // Rehydrate Date objects from serialized cache
     const data = cache.data;
-    if (!data || typeof data !== "object") return null;
+    if (data === null) return null;
+    if (!data || typeof data !== "object") return undefined;
     for (const key of ["fiveHour", "sevenDay", "sevenDaySonnet"]) {
       if (data[key] && typeof data[key].resetsAt === "string") {
         data[key].resetsAt = new Date(data[key].resetsAt);
@@ -116,16 +122,28 @@ function readCache() {
     }
     return data;
   } catch { /* no cache */ }
-  return null;
+  return undefined;
 }
 
-function writeCache(data) {
+function writeCache(data, ttl = CACHE_TTL_MS) {
   try {
     mkdirSync(CACHE_DIR, { recursive: true, mode: 0o700 });
     if (isSafeToWrite(CACHE_PATH)) {
-      writeFileSync(CACHE_PATH, JSON.stringify({ timestamp: Date.now(), data }), { mode: 0o600 });
+      writeFileSync(CACHE_PATH, JSON.stringify({ timestamp: Date.now(), ttl, data }), { mode: 0o600 });
     }
   } catch { /* cache write failed */ }
+}
+
+// Cache a failure so the API isn't retried on every render
+function cacheFailure(ttl = FAILURE_TTL_MS) {
+  writeCache(null, ttl);
+  return null;
+}
+
+function rateLimitedTtl(res) {
+  const seconds = Number(res.headers.get("retry-after"));
+  if (!Number.isFinite(seconds) || seconds <= 0) return RATE_LIMITED_TTL_MS;
+  return Math.min(MAX_RETRY_AFTER_MS, Math.max(RATE_LIMITED_TTL_MS, seconds * 1000));
 }
 
 function parseUsageEntry(obj) {
@@ -158,10 +176,10 @@ export function parseExtraUsage(obj) {
 export async function fetchUsage() {
   // Check cache first
   const cached = readCache();
-  if (cached) return cached;
+  if (cached !== undefined) return cached;
 
   const token = resolveToken();
-  if (!token) return null;
+  if (!token) return cacheFailure();
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 3000);
@@ -180,20 +198,20 @@ export async function fetchUsage() {
 
     if (!res.ok) {
       clearTimeout(timeout);
-      return null;
+      return cacheFailure(res.status === 429 ? rateLimitedTtl(res) : FAILURE_TTL_MS);
     }
 
     // Guard against oversized responses
     const contentLength = res.headers.get("content-length");
     if (contentLength && parseInt(contentLength, 10) > MAX_RESPONSE_BYTES) {
       clearTimeout(timeout);
-      return null;
+      return cacheFailure();
     }
 
     const text = await res.text();
     clearTimeout(timeout);
 
-    if (text.length > MAX_RESPONSE_BYTES) return null;
+    if (text.length > MAX_RESPONSE_BYTES) return cacheFailure();
 
     const json = JSON.parse(text);
 
@@ -208,6 +226,6 @@ export async function fetchUsage() {
     return result;
   } catch {
     clearTimeout(timeout);
-    return null;
+    return cacheFailure();
   }
 }
