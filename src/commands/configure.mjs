@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import readline from "node:readline";
 import { parseOptions, serializeOptions } from "../core/options.mjs";
 import { createMenu, plural } from "../core/menu.mjs";
-import { STATUS_LINE, isOwnStatusLine, splitCommand } from "../core/status-line.mjs";
+import { STATUS_LINE, buildCommand, isOwnStatusLine, splitCommand } from "../core/status-line.mjs";
 import { SettingsError, readSettings, writeStatusLine } from "../io/settings-file.mjs";
 import { warnReplaced } from "./install.mjs";
 
@@ -33,7 +33,7 @@ export async function configure() {
 
   const pkg = JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8"));
   const ours = isOwnStatusLine(current);
-  const { binary, args } = ours ? splitCommand(current.command) : { binary: STATUS_LINE.command, args: [] };
+  const { binary, args, suffix } = ours ? splitCommand(current.command) : { binary: STATUS_LINE.command, args: [], suffix: "" };
   const { options, errors } = parseOptions(args);
   const menu = createMenu(options, { version: pkg.version, color: !process.env.NO_COLOR });
 
@@ -72,7 +72,7 @@ export async function configure() {
 
     if (action === "save") {
       restore();
-      const command = [binary, ...serializeOptions(menu.options())].join(" ");
+      const command = buildCommand(binary, serializeOptions(menu.options()), suffix);
       const replaced = writeStatusLine(command);
       console.log(`✅ Saved to ~/.claude/settings.json\n\n   ${command}\n`);
       warnReplaced(replaced);

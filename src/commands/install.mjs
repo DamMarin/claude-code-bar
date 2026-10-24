@@ -1,6 +1,6 @@
 import { execSync } from "node:child_process";
 import { serializeOptions } from "../core/options.mjs";
-import { STATUS_LINE, isOwnStatusLine, splitCommand } from "../core/status-line.mjs";
+import { STATUS_LINE, buildCommand, isOwnStatusLine, splitCommand } from "../core/status-line.mjs";
 import { BACKUP_PATH, SettingsError, readSettings, writeStatusLine } from "../io/settings-file.mjs";
 
 export function warnReplaced(replaced) {
@@ -23,9 +23,10 @@ export async function install(options = null) {
     const existing = readSettings().statusLine;
     const ours = isOwnStatusLine(existing);
     if (options) {
-      // Keep a custom program path the user may have set, e.g. /opt/bin/claude-code-bar
-      const binary = ours ? splitCommand(existing.command).binary : STATUS_LINE.command;
-      command = [binary, ...serializeOptions(options)].join(" ");
+      // Keep a custom program path the user may have set, e.g. /opt/bin/claude-code-bar,
+      // and shell syntax after the flags, e.g. 2>/dev/null
+      const { binary, suffix } = ours ? splitCommand(existing.command) : { binary: STATUS_LINE.command, suffix: "" };
+      command = buildCommand(binary, serializeOptions(options), suffix);
     } else if (ours) {
       // Reinstalling keeps the options chosen earlier
       command = existing.command;

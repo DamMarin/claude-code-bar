@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { compareVersions } from "../src/core/version.mjs";
-import { isOwnStatusLine, splitCommand } from "../src/core/status-line.mjs";
+import { buildCommand, isOwnStatusLine, splitCommand } from "../src/core/status-line.mjs";
 
 const BIN = fileURLToPath(new URL("../bin/claude-code-bar.mjs", import.meta.url));
 const PKG = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
@@ -69,7 +69,7 @@ test("isOwnStatusLine and splitCommand know package runners", () => {
   ];
   for (const [command, binary] of commands) {
     assert.ok(isOwnStatusLine({ command }), command);
-    assert.deepEqual(splitCommand(command), { binary, args: ["--theme=ocean"] }, command);
+    assert.deepEqual(splitCommand(command), { binary, args: ["--theme=ocean"], suffix: "" }, command);
   }
   assert.ok(!isOwnStatusLine({ command: "npx claude-code-bar-fork@latest" }));
   assert.ok(!isOwnStatusLine({ command: "pnpm dlx other-bar@latest" }));
@@ -272,6 +272,46 @@ test("install keeps a package runner command and uninstall removes it", (t) => {
   assert.equal(result.status, 0);
   assert.match(result.stdout, /uninstalled/);
   assert.equal(command(), undefined);
+});
+
+test("splitCommand keeps quoted paths and shell syntax", () => {
+  const cases = [
+    ['"/Users/John Doe/bin/claude-code-bar" --theme=ocean', '"/Users/John Doe/bin/claude-code-bar"', ["--theme=ocean"], ""],
+    ["'/Users/John Doe/bin/claude-code-bar' --theme=ocean", "'/Users/John Doe/bin/claude-code-bar'", ["--theme=ocean"], ""],
+    ["/Users/John\\ Doe/bin/claude-code-bar --theme=ocean", "/Users/John\\ Doe/bin/claude-code-bar", ["--theme=ocean"], ""],
+    ["node \"/opt/my tools/bin/claude-code-bar.mjs\" --hide=\"dir,git\"", 'node "/opt/my tools/bin/claude-code-bar.mjs"', ["--hide=dir,git"], ""],
+    ["claude-code-bar --theme=ocean 2>/dev/null", "claude-code-bar", ["--theme=ocean"], "2>/dev/null"],
+    ["claude-code-bar --theme=ocean 2> /dev/null | head -3", "claude-code-bar", ["--theme=ocean"], "2> /dev/null | head -3"],
+    ["NO_COLOR=1 claude-code-bar --hide=dir", "NO_COLOR=1 claude-code-bar", ["--hide=dir"], ""],
+    ["C:\\Users\\me\\AppData\\Roaming\\npm\\claude-code-bar --theme=ocean", "C:\\Users\\me\\AppData\\Roaming\\npm\\claude-code-bar", ["--theme=ocean"], ""],
+  ];
+  for (const [command, binary, args, suffix] of cases) {
+    assert.ok(isOwnStatusLine({ command }), command);
+    assert.deepEqual(splitCommand(command), { binary, args, suffix }, command);
+  }
+  // claude-code-bar only after a pipe is someone else's command
+  assert.ok(!isOwnStatusLine({ command: "ccusage statusline 2>&1 | grep claude-code-bar" }));
+  assert.equal(buildCommand('"/a b/claude-code-bar"', ["--theme=ocean"], "2>/dev/null"), '"/a b/claude-code-bar" --theme=ocean 2>/dev/null');
+  assert.equal(buildCommand("claude-code-bar", []), "claude-code-bar");
+});
+
+// An executable file, for tests that need a program to exist (or to be on PATH)
+function makeProgram(dir, name) {
+  mkdirSync(dir, { recursive: true });
+  const path = join(dir, name);
+  writeFileSync(path, "#!/bin/sh\n", { mode: 0o755 });
+  return path;
+}
+
+test("install keeps a quoted program path and a shell suffix", (t) => {
+  const home = makeHome(t);
+  const settingsPath = join(home, ".claude", "settings.json");
+  const program = makeProgram(join(home, "my tools"), "claude-code-bar");
+  writeFileSync(settingsPath, JSON.stringify({ statusLine: { type: "command", command: `"${program}" --hide=dir 2>/dev/null` } }));
+
+  const result = run(home, ["--install", "--theme=ocean"]);
+  assert.equal(result.status, 0);
+  assert.equal(JSON.parse(readFileSync(settingsPath, "utf8")).statusLine.command, `"${program}" --theme=ocean 2>/dev/null`);
 });
 
 test("the update check never writes through a symlink in the cache", (t) => {
