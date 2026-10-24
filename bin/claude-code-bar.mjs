@@ -16,16 +16,17 @@ if (mode === "render") {
   setTimeout(() => process.exit(0), 5000).unref();
 }
 
+// Commands say what went wrong instead of exiting silently
+function report(err) {
+  console.error(`❌ Error: ${err?.message ?? err}`);
+  process.exit(1);
+}
+
 if (mode === "render") {
   // Catch anything that slips through: the status bar never crashes
   process.on("uncaughtException", () => process.exit(0));
   process.on("unhandledRejection", () => process.exit(0));
 } else {
-  // Commands say what went wrong instead of exiting silently
-  const report = (err) => {
-    console.error(`❌ Error: ${err?.message ?? err}`);
-    process.exit(1);
-  };
   process.on("uncaughtException", report);
   process.on("unhandledRejection", report);
 }

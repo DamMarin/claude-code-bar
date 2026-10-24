@@ -6,6 +6,7 @@ import { barCells } from "./progress-bar.mjs";
 import { paint, resolvePalette, styleFor } from "./style.mjs";
 
 const clamp = (pct) => Math.max(0, Math.min(100, Number.isFinite(pct) ? pct : 0));
+const money = (e, joiner) => `${formatMoney(e.usedCredits, e.currency)}${joiner}${formatMoney(e.monthlyLimit, e.currency)}`;
 
 /**
  * Renders the status bar.
@@ -63,7 +64,6 @@ export function renderStatus(data, options, { mark = [], noColor = false } = {})
     { key: "sonnet", entry: all.sevenDaySonnet, emoji: "📜 S", text: "Sonnet", short: ["S", "Sonnet"] },
     { key: "extra", entry: extra, emoji: "💰 Extra", text: "Extra", short: ["💰", "Extra"], money: true },
   ].filter((l) => l.entry && !hidden.has(l.key));
-  const money = (e, joiner) => `${formatMoney(e.usedCredits, e.currency)}${joiner}${formatMoney(e.monthlyLimit, e.currency)}`;
 
   if (options.layout === "compact") {
     const items = limits.map((l) => {

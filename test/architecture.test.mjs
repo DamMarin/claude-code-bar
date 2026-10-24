@@ -30,8 +30,8 @@ function targetLayer(fromLayer, specifier) {
 }
 
 test("src/ holds only the three layers", () => {
-  const dirs = readdirSync(SRC, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name).sort();
-  assert.deepEqual(dirs, [...LAYERS].sort());
+  const dirs = readdirSync(SRC, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name).toSorted();
+  assert.deepEqual(dirs, LAYERS.toSorted());
 });
 
 for (const layer of LAYERS) {

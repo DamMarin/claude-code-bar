@@ -17,6 +17,7 @@ const inverse = (text) => paint({ inverse: true }, text);
 const visibleLength = (s) => Array.from(s.replace(/\x1b\[[0-9;]*m/g, "")).length;
 const pad = (s, n) => s + " ".repeat(Math.max(0, n - visibleLength(s)));
 export const plural = (n) => `${n} change${n === 1 ? "" : "s"}`;
+const keyHint = (k, action) => `${inverse(` ${k} `)} ${dim(action)}`;
 
 /* ---------- Menu content ---------- */
 
@@ -71,8 +72,8 @@ export function sampleStatus(now = Date.now()) {
 }
 
 function presetOf(o) {
-  const hidden = [...o.hidden].sort().join();
-  const match = PRESETS.find(([, , h]) => [...h].sort().join() === hidden);
+  const hidden = o.hidden.toSorted().join();
+  const match = PRESETS.find(([, , h]) => h.toSorted().join() === hidden);
   return match ? match[0] : "custom";
 }
 
@@ -154,7 +155,7 @@ function rowsFor(tab, o) {
       choice({
         label: "Width", defaultValue: 10, mark: ["bars"], disabled: off,
         desc: "How many characters each bar takes.",
-        options: () => [...new Set([5, 8, 10, 12, 15, 20, o.barWidth])].sort((a, b) => a - b).map((n) => [n, `${n} cells`]),
+        options: () => [...new Set([5, 8, 10, 12, 15, 20, o.barWidth])].toSorted((a, b) => a - b).map((n) => [n, `${n} cells`]),
         get: () => o.barWidth, set: (v) => { o.barWidth = v; },
       }),
       choice({
@@ -194,12 +195,14 @@ function rowsFor(tab, o) {
   ];
 }
 
+// Colors count as one change: the theme name, plus each color for custom ones
+const colorsOf = (o) => (o.theme === "custom" ? [o.theme, ...ROLES.map((r) => o[r])].join() : o.theme);
+
 export function countChanges(a, b) {
   let n = 0;
   for (const key of SEGMENTS) if (a.hidden.includes(key) !== b.hidden.includes(key)) n++;
   if (a.order.join() !== b.order.join()) n++;
-  const colors = (o) => (o.theme === "custom" ? [o.theme, ...ROLES.map((r) => o[r])].join() : o.theme);
-  if (colors(a) !== colors(b)) n++;
+  if (colorsOf(a) !== colorsOf(b)) n++;
   for (const key of ["thMedium", "thHigh", "bar", "barWidth", "left", "countdown", "layout", "sep", "emoji"]) {
     if (a[key] !== b[key]) n++;
   }
@@ -267,10 +270,10 @@ export function createMenu(initial, { version = "", sample = sampleStatus(), col
     }
 
     if (row.type === "segment") {
-      const [name, sample] = SEGMENT_INFO[row.key];
+      const [name, example] = SEGMENT_INFO[row.key];
       const on = !o.hidden.includes(row.key);
       const moving = ui.moving && ui.moving.key === row.key;
-      const value = moving ? color("cyan", "⇅ moving") : on ? sample : dim(sample);
+      const value = moving ? color("cyan", "⇅ moving") : on ? example : dim(example);
       return `${caret}${on ? color("green", "●") : dim("○")}  ${pad(on ? label(name) : dim(name), 17)}${pad(value, 32)}${dirty} ${row.movable ? dim("≡") : ""}`;
     }
 
@@ -287,20 +290,19 @@ export function createMenu(initial, { version = "", sample = sampleStatus(), col
   }
 
   function hints(row) {
-    const key = (k, action) => `${inverse(` ${k} `)} ${dim(action)}`;
     if (ui.confirm) {
-      return `${color("yellow", `Discard ${plural(countChanges(ui.draft, ui.saved))}?`)}  ${key("y", "discard")}  ${key("n", "keep editing")}`;
+      return `${color("yellow", `Discard ${plural(countChanges(ui.draft, ui.saved))}?`)}  ${keyHint("y", "discard")}  ${keyHint("n", "keep editing")}`;
     }
-    if (ui.moving) return [key("↑↓", "move"), key("enter", "drop"), key("esc", "cancel")].join("  ");
+    if (ui.moving) return [keyHint("↑↓", "move"), keyHint("enter", "drop"), keyHint("esc", "cancel")].join("  ");
     const list = [];
     if (row.type === "segment") {
-      list.push(key("space", "show/hide"));
-      if (row.movable) list.push(key("m", "move"));
+      list.push(keyHint("space", "show/hide"));
+      if (row.movable) list.push(keyHint("m", "move"));
     }
-    if (row.type === "theme" && row.id !== ui.draft.theme) list.push(key("space", "use theme"));
-    if (row.type === "choice" && !row.disabled) list.push(key("←→", "change"));
-    if (!row.disabled && !isDefaultRow(row, ui.draft)) list.push(key("r", "reset"));
-    list.push(key("tab", "next tab"), key("enter", "save"), key("esc", "quit"));
+    if (row.type === "theme" && row.id !== ui.draft.theme) list.push(keyHint("space", "use theme"));
+    if (row.type === "choice" && !row.disabled) list.push(keyHint("←→", "change"));
+    if (!row.disabled && !isDefaultRow(row, ui.draft)) list.push(keyHint("r", "reset"));
+    list.push(keyHint("tab", "next tab"), keyHint("enter", "save"), keyHint("esc", "quit"));
     return list.join("  ");
   }
 
