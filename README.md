@@ -144,6 +144,25 @@ This project follows [ZeroVer](https://0ver.org/) (0-based versioning).
 
 ---
 
+## 🧑‍💻 Development
+
+```bash
+npm test
+```
+
+Tests use the built-in `node --test` runner — still zero dependencies. CI runs them on Node 18, 20 and 22, on Linux and macOS.
+
+### Releasing
+
+```bash
+npm version patch   # runs the tests, bumps package.json, commits and tags vX.Y.Z
+git push --follow-tags
+```
+
+The tag triggers the release workflow, which checks that the tag matches `package.json`, runs the tests and publishes to npm.
+
+---
+
 ## 📄 License
 
 MIT — see [LICENSE](./LICENSE)
