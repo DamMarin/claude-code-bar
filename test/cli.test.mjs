@@ -514,3 +514,34 @@ for (const [signal, code] of [["SIGTERM", 143], ["SIGHUP", 129]]) {
     assert.ok(restored(screen));
   });
 }
+
+test("render fills the windows Claude Code did not send from the cached usage", (t) => {
+  const home = makeHome(t);
+  const cacheFile = join(home, ".cache", "claude-code-bar", "usage-cache.json");
+  // A too-short token, so a cache miss reads no real credentials and makes no network call
+  const env = { CLAUDE_CODE_OAUTH_TOKEN: "acct-a", PATH: join(home, "empty-bin") };
+  const stdin = JSON.stringify({ workspace: { current_dir: home }, rate_limits: { five_hour: { used_percentage: 48 } } });
+  const args = ["--hide=model,context,duration,dir,git,update", "--no-color"];
+
+  // The first run caches a failure stamped with this login's fingerprint; only the 5h row shows
+  assert.equal(run(home, args, stdin, env).stdout, "⏱️ 5h  ▓▓▓▓▓░░░░░ 48%  resets ?\n");
+
+  // What the usage API would have answered, in that cache entry
+  const cache = JSON.parse(readFileSync(cacheFile, "utf8"));
+  cache.data = {
+    fiveHour: { percentage: 99, resetsAt: null },
+    sevenDay: { percentage: 21, resetsAt: null },
+    sevenDaySonnet: { percentage: 5, resetsAt: null },
+    extraUsage: { percentage: 18.35, usedCredits: 1560, monthlyLimit: 8500, currency: "EUR" },
+  };
+  writeFileSync(cacheFile, JSON.stringify(cache));
+
+  // 5h stays what Claude Code sent; the other three come from the API
+  assert.equal(run(home, args, stdin, env).stdout, [
+    "⏱️ 5h  ▓▓▓▓▓░░░░░ 48%  resets ?",
+    "📅 7d  ▓▓░░░░░░░░ 21%  resets ?",
+    "📜 S  ▓░░░░░░░░░ 5%  resets ?",
+    "💰 Extra  ▓▓░░░░░░░░ 18%  €15.60 / €85",
+    "",
+  ].join("\n"));
+});

@@ -9,27 +9,30 @@ import { readDefaultModel } from "../io/settings-file.mjs";
 import { fetchUsage, parseExtraUsage } from "../io/usage-api.mjs";
 import { getUpdateInfo, scheduleUpdateCheck } from "../io/update-check.mjs";
 
-// Rate limits: prefer stdin data, fall back to the OAuth usage API.
-// Nothing is fetched (and no token is read) for limits that are hidden.
-async function loadRateLimits(data, hidden) {
-  if (RATE_LIMITS.every((key) => hidden.has(key))) return {};
+// The segment that shows each rate limit window
+const WINDOWS = { "5h": "fiveHour", "7d": "sevenDay", sonnet: "sevenDaySonnet", extra: "extraUsage" };
 
-  if (data?.rate_limits && typeof data.rate_limits === "object") {
-    const limits = {
-      fiveHour: parseRateLimit(data.rate_limits.five_hour),
-      sevenDay: parseRateLimit(data.rate_limits.seven_day),
-      sevenDaySonnet: parseRateLimit(data.rate_limits.seven_day_sonnet),
-      extraUsage: parseExtraUsage(data.rate_limits.extra_usage),
-    };
-    // Stdin doesn't always include rich extra_usage fields — fill from OAuth.
-    if (!limits.extraUsage && !hidden.has("extra")) {
-      const oauth = await fetchUsage();
-      if (oauth?.extraUsage) limits.extraUsage = oauth.extraUsage;
-    }
-    return limits;
-  }
+/**
+ * Rate limits: what Claude Code sent on stdin, with every shown window it left out filled
+ * from the OAuth usage API. Claude Code sends five_hour and seven_day (and drops a window
+ * once it resets); the Sonnet and extra usage windows only come from the API. Nothing is
+ * fetched, and no token is read, while every window that is shown is already known.
+ * `usage` stands in for fetchUsage, for tests.
+ */
+export async function loadRateLimits(data, hidden, { usage = fetchUsage } = {}) {
+  const sent = data?.rate_limits && typeof data.rate_limits === "object" ? data.rate_limits : {};
+  const limits = {
+    fiveHour: parseRateLimit(sent.five_hour),
+    sevenDay: parseRateLimit(sent.seven_day),
+    sevenDaySonnet: parseRateLimit(sent.seven_day_sonnet),
+    extraUsage: parseExtraUsage(sent.extra_usage),
+  };
+  const missing = RATE_LIMITS.filter((segment) => !hidden.has(segment) && !limits[WINDOWS[segment]]).map((segment) => WINDOWS[segment]);
+  if (missing.length === 0) return limits;
 
-  return (await fetchUsage()) ?? {};
+  const oauth = await usage();
+  for (const key of missing) if (oauth?.[key]) limits[key] = oauth[key];
+  return limits;
 }
 
 export async function render(options = DEFAULT_OPTIONS) {
