@@ -36,6 +36,20 @@ jobs:
             exit 1
           fi
 
+      # The release notes are the tag's section of CHANGELOG.md. A release without one
+      # fails here, before anything is published.
+      - name: Release notes from CHANGELOG.md
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          awk -v v="$VERSION" '/^## \[/ { p = index($0, "[" v "]") > 0; next } p' CHANGELOG.md > release-notes.md
+          if [ ! -s release-notes.md ]; then
+            echo "::error::CHANGELOG.md has no '## [$VERSION]' section. Add the release notes there first."
+            exit 1
+          fi
+
+      - name: Lint
+        run: npm run lint
+
       - name: Test
         run: npm test
 
@@ -61,5 +75,7 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@da05d552573ad5aba039eaac05058a918a7bf631
         with:
+          # The CHANGELOG section, followed by the generated list of merged pull requests
+          body_path: release-notes.md
           generate_release_notes: true
           prerelease: ${{ contains(github.ref_name, '-') }}

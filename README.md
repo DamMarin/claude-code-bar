@@ -182,7 +182,7 @@ npm uninstall -g claude-code-bar
 
 ## 🧪 Requirements
 
-* Node.js 22+
+* Node.js 22+ (since 1.1.0; 1.0.0 ran on Node 18)
 * Claude Code CLI
 
 ---
@@ -250,12 +250,14 @@ Linting uses [oxlint](https://oxc.rs/docs/guide/usage/linter.html) with its `cor
 
 ### Releasing
 
+First add the version's section to `CHANGELOG.md`: the release workflow publishes it as the GitHub release notes, and fails without it. Then:
+
 ```bash
 npm version patch   # or minor / major; runs the linter and tests, bumps package.json, commits and tags vX.Y.Z
 git push --follow-tags
 ```
 
-The tag triggers the release workflow, which checks that the tag matches `package.json`, runs the tests and publishes to npm.
+The tag triggers the release workflow, which checks that the tag matches `package.json` and has a `CHANGELOG.md` section, lints, runs the tests, publishes to npm and creates the GitHub release with those notes.
 
 A prerelease (`npm version prerelease --preid=beta`, giving e.g. `v1.1.0-beta.0`) is published under the `beta` dist-tag and marked as a prerelease on GitHub, so `npm install -g claude-code-bar` keeps installing the last release.
 
