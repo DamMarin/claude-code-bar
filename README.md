@@ -146,6 +146,8 @@ If you prefer manual configuration:
 
 File: `~/.claude/settings.json`
 
+`--install` and `--config` keep `padding`, `refreshInterval` and anything else you set here, and change only `command`.
+
 Add [display options](#-customize) to `command`, e.g. `"claude-code-bar --theme=ocean --no-emoji"`.
 
 The command can also run claude-code-bar through a package runner (`npx claude-code-bar@latest`, `pnpm dlx`, `yarn dlx`, `bunx`), from a quoted path with spaces (`"/Users/John Doe/bin/claude-code-bar"`), or with shell syntax after the options (`2>/dev/null`). `--install`, `--config` and `--uninstall` recognize all of these and change only the options.

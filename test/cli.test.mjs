@@ -467,10 +467,11 @@ test("--config keeps the program and shell suffix of the current command", (t) =
   const home = makeHome(t);
   const settingsPath = join(home, ".claude", "settings.json");
   const command = `"${join(home, "my tools", "claude-code-bar")}" --theme=ocean 2>/dev/null`;
-  writeFileSync(settingsPath, JSON.stringify({ statusLine: { type: "command", command } }));
+  const statusLine = { type: "command", command, padding: 1, refreshInterval: 5 };
+  writeFileSync(settingsPath, JSON.stringify({ statusLine }));
 
   assert.equal(runConfig(home, ["\r"]).status, 0);
-  assert.equal(JSON.parse(readFileSync(settingsPath, "utf8")).statusLine.command, command);
+  assert.deepEqual(JSON.parse(readFileSync(settingsPath, "utf8")).statusLine, statusLine);
 });
 
 test("--config saves nothing on Ctrl+C and names flags it ignored", (t) => {
@@ -514,6 +515,24 @@ for (const [signal, code] of [["SIGTERM", 143], ["SIGHUP", 129]]) {
     assert.ok(restored(screen));
   });
 }
+
+test("install keeps padding and refreshInterval on our own statusLine", (t) => {
+  const home = makeHome(t);
+  const settingsPath = join(home, ".claude", "settings.json");
+  const statusLine = () => JSON.parse(readFileSync(settingsPath, "utf8")).statusLine;
+  writeFileSync(settingsPath, JSON.stringify({ statusLine: { type: "command", command: "claude-code-bar --hide=dir", padding: 1, refreshInterval: 5 } }));
+
+  assert.equal(run(home, ["--install", "--theme=ocean"]).status, 0);
+  assert.deepEqual(statusLine(), { type: "command", command: "claude-code-bar --theme=ocean", padding: 1, refreshInterval: 5 });
+
+  assert.equal(run(home, ["--install"]).status, 0);
+  assert.deepEqual(statusLine(), { type: "command", command: "claude-code-bar --theme=ocean", padding: 1, refreshInterval: 5 });
+
+  // A refreshInterval the user removed is not put back
+  writeFileSync(settingsPath, JSON.stringify({ statusLine: { type: "command", command: "claude-code-bar" } }));
+  assert.equal(run(home, ["--install", "--no-emoji"]).status, 0);
+  assert.deepEqual(statusLine(), { type: "command", command: "claude-code-bar --no-emoji" });
+});
 
 test("render fills the windows Claude Code did not send from the cached usage", (t) => {
   const home = makeHome(t);

@@ -48,12 +48,15 @@ export function writeStatusLine(command) {
   const settings = readSettings();
 
   const existing = settings.statusLine;
-  const replaced = existing !== undefined && !isOwnStatusLine(existing) ? existing : null;
+  const ours = isOwnStatusLine(existing);
+  const replaced = existing !== undefined && !ours ? existing : null;
   if (replaced !== null) {
     atomicWriteJson(BACKUP_PATH, { statusLine: replaced, savedAt: new Date().toISOString() });
   }
 
-  settings.statusLine = { ...STATUS_LINE, command };
+  // Our own statusLine keeps whatever else the user set on it (padding, refreshInterval);
+  // only the command changes. A new or replaced one starts from the defaults.
+  settings.statusLine = { type: STATUS_LINE.type, ...(ours ? existing : STATUS_LINE), command };
   atomicWriteJson(SETTINGS_PATH, settings);
   return replaced;
 }
