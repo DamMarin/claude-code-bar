@@ -177,7 +177,7 @@ npm uninstall -g claude-code-bar
 
 ## 🧪 Requirements
 
-* Node.js 18+
+* Node.js 22+
 * Claude Code CLI
 
 ---
@@ -237,7 +237,7 @@ The public API is the set of commands (`--install`, `--uninstall`, `--config`, `
 npm test
 ```
 
-Tests use the built-in `node --test` runner — still zero dependencies. CI runs them on Node 18, 20 and 22, on Linux and macOS.
+Tests use the built-in `node --test` runner — still zero dependencies. CI runs them on Node 22, 24 and 26, on Linux and macOS.
 
 ### Releasing
 
