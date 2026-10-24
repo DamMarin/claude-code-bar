@@ -1,7 +1,10 @@
+// The statusLine --install writes. refreshInterval re-runs the bar while the session is idle,
+// so reset countdowns and the limits (cached for a minute anyway) stay current.
 export const STATUS_LINE = {
   type: "command",
   command: "claude-code-bar",
   padding: 0,
+  refreshInterval: 60,
 };
 
 // The program name as it appears in a command: a path to the bin script, or a package

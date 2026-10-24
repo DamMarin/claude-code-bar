@@ -139,14 +139,15 @@ If you prefer manual configuration:
   "statusLine": {
     "type": "command",
     "command": "claude-code-bar",
-    "padding": 0
+    "padding": 0,
+    "refreshInterval": 60
   }
 }
 ```
 
 File: `~/.claude/settings.json`
 
-`--install` and `--config` keep `padding`, `refreshInterval` and anything else you set here, and change only `command`.
+`refreshInterval` re-runs the bar every minute while the session is idle, so reset countdowns and the limits stay current; leave it out if you only want updates when something happens in the session. `--install` and `--config` keep `padding`, `refreshInterval` and anything else you set here, and change only `command`.
 
 Add [display options](#-customize) to `command`, e.g. `"claude-code-bar --theme=ocean --no-emoji"`.
 

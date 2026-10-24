@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { compareVersions } from "../src/core/version.mjs";
-import { buildCommand, commandExecutable, isOwnStatusLine, splitCommand } from "../src/core/status-line.mjs";
+import { STATUS_LINE, buildCommand, commandExecutable, isOwnStatusLine, splitCommand } from "../src/core/status-line.mjs";
 
 const BIN = fileURLToPath(new URL("../bin/claude-code-bar.mjs", import.meta.url));
 const PKG = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
@@ -122,7 +122,8 @@ test("install backs up a foreign statusLine and uninstall restores it", (t) => {
   const readSettings = () => JSON.parse(readFileSync(settingsPath, "utf8"));
 
   assert.equal(run(home, ["--install"]).status, 0);
-  assert.equal(readSettings().statusLine.command, "claude-code-bar");
+  assert.deepEqual(readSettings().statusLine, STATUS_LINE);
+  assert.equal(readSettings().statusLine.refreshInterval, 60); // a new install refreshes the bar every minute while idle
   assert.equal(readSettings().model, "opus");
 
   // Reinstalling must not overwrite the backup with our own statusLine
@@ -403,9 +404,9 @@ test("the usage cache is dropped when the login changes", (t) => {
 test("install keeps the layout and permissions of settings.json", { skip: process.platform === "win32" }, (t) => {
   const home = makeHome(t);
   const settingsPath = join(home, ".claude", "settings.json");
-  const statusLine = { type: "command", command: "claude-code-bar", padding: 0 };
+  const statusLine = STATUS_LINE;
   const cases = [
-    ['{\n\t"model": "opus"\n}\n', 0o644, '{\n\t"model": "opus",\n\t"statusLine": {\n\t\t"type": "command",\n\t\t"command": "claude-code-bar",\n\t\t"padding": 0\n\t}\n}\n'],
+    ['{\n\t"model": "opus"\n}\n', 0o644, `${JSON.stringify({ model: "opus", statusLine }, null, "\t")}\n`],
     ['{\n    "model": "opus"\n}', 0o640, `${JSON.stringify({ model: "opus", statusLine }, null, 4)}`],
     ['{"model":"opus"}\n', 0o600, `${JSON.stringify({ model: "opus", statusLine })}\n`],
   ];
