@@ -41,13 +41,18 @@ export function readJson(filePath) {
   }
 }
 
-// Best-effort cache write in CACHE_DIR; a failed write is never an error
+// Best-effort cache write in CACHE_DIR; a failed write is never an error.
+// Returns whether the file was written.
 export function writeCacheJson(name, data) {
   try {
     mkdirSync(CACHE_DIR, { recursive: true, mode: 0o700 });
     const filePath = join(CACHE_DIR, name);
-    if (isSafeToWrite(filePath)) writeFileSync(filePath, JSON.stringify(data), { mode: 0o600 });
-  } catch { /* cache write failed — not critical */ }
+    if (!isSafeToWrite(filePath)) return false;
+    writeFileSync(filePath, JSON.stringify(data), { mode: 0o600 });
+    return true;
+  } catch {
+    return false; // cache write failed — not critical
+  }
 }
 
 export function readCacheJson(name) {

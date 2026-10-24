@@ -1,11 +1,10 @@
 // Checks npm for a newer claude-code-bar, at most once a day, in the background
-import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { spawn } from "node:child_process";
-import { join } from "node:path";
 import { compareVersions } from "../core/version.mjs";
-import { CACHE_DIR, readJson } from "./files.mjs";
+import { readCacheJson, writeCacheJson } from "./files.mjs";
 
-const CACHE_FILE = join(CACHE_DIR, "update-check.json");
+const CACHE_NAME = "update-check.json";
 const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
 const RETRY_INTERVAL_MS = 60 * 60 * 1000; // after a failed or in-flight check
 
@@ -16,7 +15,7 @@ export function getPkg() {
 }
 
 function readCache() {
-  return readJson(CACHE_FILE) ?? null;
+  return readCacheJson(CACHE_NAME) ?? null;
 }
 
 function normalizedLatest(cache) {
@@ -60,17 +59,14 @@ export function scheduleUpdateCheck() {
   const cache = readCache();
   if (shouldThrottleScheduledCheck(cache)) return;
 
-  // Record the attempt before spawning, so concurrent renders don't spawn too
-  try {
-    mkdirSync(CACHE_DIR, { recursive: true, mode: 0o700 });
-    writeFileSync(CACHE_FILE, JSON.stringify({ ...cache, attemptedAt: Date.now() }));
-  } catch {
-    return;
-  }
+  // Record the attempt before spawning, so concurrent renders don't spawn too.
+  // No record (unwritable cache, or a symlink in its place) means no check at all.
+  if (!writeCacheJson(CACHE_NAME, { ...cache, attemptedAt: Date.now() })) return;
 
   const pkg = getPkg();
+  // The child writes through writeCacheJson too, so it gets the same symlink check and file mode
   const script = `
-    const { writeFileSync, mkdirSync } = require("node:fs");
+    import { writeCacheJson } from ${JSON.stringify(new URL("./files.mjs", import.meta.url).href)};
     (async () => {
       try {
         const controller = new AbortController();
@@ -82,16 +78,15 @@ export function scheduleUpdateCheck() {
         if (!res.ok) process.exit(0);
         const data = await res.json();
         if (typeof data.version !== "string") process.exit(0);
-        mkdirSync(${JSON.stringify(CACHE_DIR)}, { recursive: true });
-        writeFileSync(${JSON.stringify(CACHE_FILE)}, JSON.stringify({
+        writeCacheJson(${JSON.stringify(CACHE_NAME)}, {
           latest: data.version,
           checkedAt: Date.now(),
-        }));
+        });
       } catch {}
     })();
   `;
 
-  const child = spawn(process.execPath, ["-e", script], {
+  const child = spawn(process.execPath, ["--input-type=module", "-e", script], {
     detached: true,
     stdio: "ignore",
   });

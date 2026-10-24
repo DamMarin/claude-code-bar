@@ -273,3 +273,16 @@ test("install keeps a package runner command and uninstall removes it", (t) => {
   assert.match(result.stdout, /uninstalled/);
   assert.equal(command(), undefined);
 });
+
+test("the update check never writes through a symlink in the cache", (t) => {
+  const home = makeHome(t);
+  const cacheFile = join(home, ".cache", "claude-code-bar", "update-check.json");
+  const target = join(home, "elsewhere.json");
+  writeFileSync(target, "{}");
+  rmSync(cacheFile);
+  symlinkSync(target, cacheFile);
+
+  const input = JSON.stringify({ workspace: { current_dir: home } });
+  assert.equal(run(home, ["--hide=git,5h,7d,sonnet,extra"], input).status, 0);
+  assert.equal(readFileSync(target, "utf8"), "{}");
+});
