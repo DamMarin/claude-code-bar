@@ -565,3 +565,13 @@ test("render fills the windows Claude Code did not send from the cached usage", 
     "",
   ].join("\n"));
 });
+
+test("render shows a dash while the context size is unknown", (t) => {
+  const home = makeHome(t);
+  const args = ["--hide=duration,dir,git,update,5h,7d,sonnet,extra", "--no-color"];
+  // null early in a session, or no context_window at all
+  for (const input of ['{"model":{"display_name":"Opus"},"context_window":{"used_percentage":null}}', '{"model":{"display_name":"Opus"}}']) {
+    assert.equal(run(home, args, input).stdout, "🤖 Opus │ 🧠 –\n");
+  }
+  assert.equal(run(home, args, '{"model":{"display_name":"Opus"},"context_window":{"used_percentage":0}}').stdout, "🤖 Opus │ 🧠 0%\n");
+});

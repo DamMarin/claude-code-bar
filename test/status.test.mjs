@@ -104,3 +104,15 @@ test("formatCountdown", () => {
   assert.equal(formatCountdown(new Date(now + 130 * MIN + 30000)), "in 2h10m");
   assert.equal(formatCountdown(new Date(now + (3 * 1440 + 240) * MIN + 30000)), "in 3d4h");
 });
+
+test("an unknown context size shows a dash, not 0%", () => {
+  for (const contextPct of [null, undefined]) {
+    const { head } = render(["--no-color"], data({ contextPct }));
+    assert.equal(head, "🤖 Opus 5.5 │ 🧠 – │ ⏱️ 2m14s │ demo │ main*");
+  }
+  // The dash has no level color, and "left" has nothing to count down from
+  assert.equal(render(["--show=left"], data({ contextPct: null })).head.split(" │ ")[1], "🧠 –");
+  assert.equal(render(["--layout=compact", "--no-emoji", "--no-color"], data({ contextPct: null })).head.split(" │ ")[1], "ctx –");
+  // 0 is a real value
+  assert.match(render(["--no-color"], data({ contextPct: 0 })).head, /🧠 0%/);
+});

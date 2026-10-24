@@ -11,7 +11,7 @@ const money = (e, joiner) => `${formatMoney(e.usedCredits, e.currency)}${joiner}
 /**
  * Renders the status bar.
  *
- * data: { model, contextPct, durationMs, dir, git: { branch, dirty } | null,
+ * data: { model, contextPct (null until known), durationMs, dir, git: { branch, dirty } | null,
  *         update: latest version | null,
  *         limits: { fiveHour, sevenDay, sevenDaySonnet, extraUsage } }
  *
@@ -41,10 +41,13 @@ export function renderStatus(data, options, { mark = [], noColor = false } = {})
     : palette.mono || palette.hc || (palette.accent && palette.accent !== "none") ? accent
     : styleFor(palette, "medium");
 
-  const ctx = clamp(data.contextPct);
+  // Early in a session Claude Code doesn't know the context size yet: show "–", not 0%
+  const ctx = data.contextPct === null || data.contextPct === undefined ? null : clamp(data.contextPct);
   const parts = {
     model: (u) => label(emoji ? "🤖 " : "", u) + paint(accent, data.model, u || m("accent")),
-    context: (u) => label(emoji ? "🧠 " : "ctx ", u) + paint(levelStyle(ctx), pctText(ctx), u || m("pct") || levelMarked(ctx)),
+    context: (u) => label(emoji ? "🧠 " : "ctx ", u) + (ctx === null
+      ? paint({}, "–", u || m("pct"))
+      : paint(levelStyle(ctx), pctText(ctx), u || m("pct") || levelMarked(ctx))),
     duration: (u) => label(emoji ? "⏱️ " : "", u) + paint({}, formatDuration(data.durationMs), u),
     dir: (u) => (data.dir ? paint({}, data.dir, u) : null),
     git: (u) => (data.git ? paint(accent, `${data.git.branch}${data.git.dirty ? "*" : ""}`, u || m("accent")) : null),

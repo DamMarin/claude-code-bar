@@ -41,7 +41,10 @@ export function safeString(val, fallback) {
   return typeof val === "string" && val.length > 0 && val.length < 256 ? val : fallback;
 }
 
+// null is "not known yet" in Claude Code's JSON (e.g. the context size early in a
+// session), so it falls back like a missing field instead of becoming 0
 export function safeNumber(val, fallback, min = 0, max = Infinity) {
+  if (val === null) return fallback;
   const n = Number(val);
   if (!Number.isFinite(n)) return fallback;
   return Math.max(min, Math.min(max, n));

@@ -49,7 +49,7 @@ All in one clean status bar.
 
 ## 🧩 What you get
 
-* Context window usage (color-coded)
+* Context window usage (color-coded; `–` until Claude Code reports it, early in a session)
 * 5-hour & 7-day rate limits
 * Sonnet-specific usage tracking
 * Extra usage spend (e.g. `€15.60 / €85`) with currency from your account

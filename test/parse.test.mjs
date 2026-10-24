@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { parseExtraUsage } from "../src/io/usage-api.mjs";
-import { parseRateLimit } from "../src/io/stdin.mjs";
+import { parseRateLimit, safeNumber } from "../src/io/stdin.mjs";
 import { barCells } from "../src/core/progress-bar.mjs";
 import { stripControl } from "../src/core/sanitize.mjs";
 
@@ -9,6 +9,7 @@ test("parseRateLimit", () => {
   assert.equal(parseRateLimit(null), null);
   assert.equal(parseRateLimit({}), null);
   assert.equal(parseRateLimit({ used_percentage: "abc" }), null);
+  assert.equal(parseRateLimit({ used_percentage: null }), null);
 
   assert.deepEqual(parseRateLimit({ used_percentage: 48, resets_at: 1_800_000_000 }), {
     percentage: 48,
@@ -69,4 +70,13 @@ test("stripControl removes escape sequences whole, then control characters", () 
   assert.equal(stripControl("a\x1b]8;;https://example.com\x1b\\link\x1b]8;;\x1b\\b"), "alinkb");
   assert.equal(stripControl("line\nbreak\ttab\x9bc1"), "linebreaktabc1");
   assert.equal(stripControl("feature/ünïcödé-🚀"), "feature/ünïcödé-🚀");
+});
+
+test("safeNumber treats null like a missing value, not like 0", () => {
+  assert.equal(safeNumber(null, "unknown"), "unknown");
+  assert.equal(safeNumber(undefined, "unknown"), "unknown");
+  assert.equal(safeNumber("abc", "unknown"), "unknown");
+  assert.equal(safeNumber(0, "unknown"), 0);
+  assert.equal(safeNumber("30", "unknown", 0, 100), 30);
+  assert.equal(safeNumber(150, null, 0, 100), 100);
 });

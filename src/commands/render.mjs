@@ -46,7 +46,7 @@ export async function render(options = DEFAULT_OPTIONS) {
     const cwd = safeString(data?.workspace?.current_dir, process.cwd());
     const status = {
       model: stripControl(safeString(data?.model?.display_name, null) || safeString(readDefaultModel(), "unknown")),
-      contextPct: safeNumber(data?.context_window?.used_percentage, 0, 0, 100),
+      contextPct: safeNumber(data?.context_window?.used_percentage, null, 0, 100), // null until known
       durationMs: safeNumber(data?.cost?.total_duration_ms, 0, 0),
       dir: stripControl(basename(cwd)),
       git: hidden.has("git") ? null : getGitInfo(cwd),
