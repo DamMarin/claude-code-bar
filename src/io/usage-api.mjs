@@ -170,7 +170,13 @@ export function parseExtraUsage(obj) {
   };
 }
 
-export async function fetchUsage() {
+export const USAGE_URL = "https://api.anthropic.com/api/oauth/usage";
+
+/**
+ * Usage data for the logged-in account, from the cache or the API; null when unavailable.
+ * `request` stands in for fetch, so tests can answer without the network.
+ */
+export async function fetchUsage({ request = fetch } = {}) {
   // Check cache first
   const fingerprint = credentialsFingerprint();
   const cached = readCache(fingerprint);
@@ -184,7 +190,7 @@ export async function fetchUsage() {
 
   try {
 
-    const res = await fetch("https://api.anthropic.com/api/oauth/usage", {
+    const res = await request(USAGE_URL, {
       headers: {
         "Authorization": `Bearer ${token}`,
         "Content-Type": "application/json",
