@@ -51,11 +51,28 @@ export function getUpdateInfo() {
 }
 
 /**
+ * Asks npm for the latest version and caches it. The background process started by
+ * scheduleUpdateCheck runs this. `request` stands in for fetch, for tests. Never throws.
+ */
+export async function checkLatest({ request = fetch } = {}) {
+  try {
+    const res = await request(`https://registry.npmjs.org/${getPkg().name}/latest`, {
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (typeof data?.version !== "string") return;
+    writeCacheJson(CACHE_NAME, { latest: data.version, checkedAt: Date.now() });
+  } catch { /* offline or slow: the next scheduled check tries again */ }
+}
+
+/**
  * Spawns a detached background process to check npm for updates.
  * Skips if the last successful check is fresher than 24 hours, or if a check
  * was attempted within the last hour (so failures don't retry on every render).
+ * `start` stands in for child_process.spawn, for tests.
  */
-export function scheduleUpdateCheck() {
+export function scheduleUpdateCheck({ start = spawn } = {}) {
   const cache = readCache();
   if (shouldThrottleScheduledCheck(cache)) return;
 
@@ -63,30 +80,8 @@ export function scheduleUpdateCheck() {
   // No record (unwritable cache, or a symlink in its place) means no check at all.
   if (!writeCacheJson(CACHE_NAME, { ...cache, attemptedAt: Date.now() })) return;
 
-  const pkg = getPkg();
-  // The child writes through writeCacheJson too, so it gets the same symlink check and file mode
-  const script = `
-    import { writeCacheJson } from ${JSON.stringify(new URL("./files.mjs", import.meta.url).href)};
-    (async () => {
-      try {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 5000);
-        const res = await fetch(${JSON.stringify(`https://registry.npmjs.org/${pkg.name}/latest`)}, {
-          signal: controller.signal,
-        });
-        clearTimeout(timeout);
-        if (!res.ok) process.exit(0);
-        const data = await res.json();
-        if (typeof data.version !== "string") process.exit(0);
-        writeCacheJson(${JSON.stringify(CACHE_NAME)}, {
-          latest: data.version,
-          checkedAt: Date.now(),
-        });
-      } catch {}
-    })();
-  `;
-
-  const child = spawn(process.execPath, ["--input-type=module", "-e", script], {
+  const script = `import { checkLatest } from ${JSON.stringify(import.meta.url)}; await checkLatest();`;
+  const child = start(process.execPath, ["--input-type=module", "-e", script], {
     detached: true,
     stdio: "ignore",
   });
