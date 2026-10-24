@@ -248,6 +248,8 @@ git push --follow-tags
 
 The tag triggers the release workflow, which checks that the tag matches `package.json`, runs the tests and publishes to npm.
 
+A prerelease (`npm version prerelease --preid=beta`, giving e.g. `v1.1.0-beta.0`) is published under the `beta` dist-tag and marked as a prerelease on GitHub, so `npm install -g claude-code-bar` keeps installing the last release.
+
 ---
 
 ## 📄 License
