@@ -21,6 +21,9 @@ so every release needs one.
 - Git info comes from one `git status --porcelain=v2 --branch`, run without a shell, instead of two or three commands through one.
 - The login token is read from the macOS keychain (`security`) and the Linux secret store (`secret-tool`) without a shell in between. claude-code-bar no longer runs anything through a shell.
 
+### Fixed
+- Rate limits read with the login token from the macOS keychain or the Linux secret store failed when Claude Code also keeps MCP server logins there: the stored credentials grow past 16 KB, which was the limit. It is 1 MB now. Without the token, the Sonnet and extra usage rows never appeared.
+
 ## [1.1.0] - 2026-10-24
 
 **Requires Node 22 or newer.** 1.0.0 ran on Node 18; Node 18 and 20 are past end of life.

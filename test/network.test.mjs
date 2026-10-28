@@ -70,12 +70,15 @@ test("fetchUsage sends the login token and parses the answer", async () => {
   assert.ok(calls[0].init.signal instanceof AbortSignal);
 });
 
-test("the keychain token is read without a shell, the service name as one argument", { skip: process.platform === "win32" && "no sh scripts" }, async (t) => {
+test("the keychain token is read without a shell, from credentials over 16 KB", { skip: process.platform === "win32" && "no sh scripts" }, async (t) => {
   const bin = join(home, "keychain-bin");
   const argsFile = join(home, "security-args.txt");
   mkdirSync(bin, { recursive: true });
   // A stand-in `security` that records its arguments, one per line, and prints the credentials
-  const credentials = JSON.stringify({ claudeAiOauth: { accessToken: "sk-ant-oat01-keychain-token" } });
+  // Over 16 KB, like real credentials with many MCP servers logged in
+  const mcpOAuth = Object.fromEntries(Array.from({ length: 100 }, (_, i) => [`server-${i}`, { serverUrl: `https://mcp-${i}.example.com/${"x".repeat(150)}` }]));
+  const credentials = JSON.stringify({ mcpOAuth, claudeAiOauth: { accessToken: "sk-ant-oat01-keychain-token" } });
+  assert.ok(credentials.length > 16 * 1024);
   writeFileSync(join(bin, "security"), `#!/bin/sh\nprintf '%s\\n' "$@" > '${argsFile}'\necho '${credentials}'\n`, { mode: 0o755 });
 
   const saved = { PATH: process.env.PATH, token: process.env.CLAUDE_CODE_OAUTH_TOKEN };
