@@ -1,7 +1,6 @@
 # claude-code-bar
 
-[![npm](https://img.shields.io/npm/v/claude-code-bar)](https://www.npmjs.com/package/claude-code-bar)
-[![npm provenance](https://img.shields.io/badge/npm-provenance-2ea44f?logo=npm)](https://www.npmjs.com/package/claude-code-bar#provenance)
+[![npm](https://img.shields.io/npm/v/claude-code-bar)](https://www.npmjs.com/package/claude-code-bar) [![CI](https://img.shields.io/github/actions/workflow/status/DamMarin/claude-code-bar/ci.yml?branch=main&label=CI)](https://github.com/DamMarin/claude-code-bar/actions/workflows/ci.yml) [![node](https://img.shields.io/node/v/claude-code-bar)](https://nodejs.org/) [![dependencies](https://img.shields.io/badge/dependencies-0-2ea44f)](https://www.npmjs.com/package/claude-code-bar?activeTab=dependencies) [![license](https://img.shields.io/npm/l/claude-code-bar)](LICENSE) [![npm provenance](https://img.shields.io/badge/npm-provenance-2ea44f?logo=npm)](https://www.npmjs.com/package/claude-code-bar#provenance)
 
 Never lose track of Claude Code context usage, rate limits, and git state - all in your terminal.
 
