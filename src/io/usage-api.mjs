@@ -14,7 +14,8 @@ const FAILURE_TTL_MS = 60000; // missing token, network error, bad response
 const RATE_LIMITED_TTL_MS = 5 * 60000; // HTTP 429
 const GONE_TTL_MS = 60 * 60000; // HTTP 404 or 410: the endpoint may have been removed
 const MAX_RETRY_AFTER_MS = 30 * 60000;
-const MAX_BUFFER = 16 * 1024; // 16 KB — credentials JSON is small
+// 1 MB: the credentials also hold the OAuth tokens of every MCP server, 20 KB and more
+const MAX_BUFFER = 1024 * 1024;
 // The keychain tools run directly, without a shell in between
 const EXEC_OPTS = { encoding: "utf8", timeout: 2000, maxBuffer: MAX_BUFFER, stdio: ["pipe", "pipe", "pipe"] };
 const MAX_RESPONSE_BYTES = 64 * 1024; // 64 KB — reject oversized API responses
