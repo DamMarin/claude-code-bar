@@ -14,6 +14,7 @@ so every release needs one.
 - `--context=tokens` shows the context as tokens out of the window size (`46k/200k`), and `--context=both` shows both (`30% (46k/200k)`). The percentage stays the default.
 - Two segments that are off by default, turned on with `--add` or in `--config`: `cost`, the estimated session cost Claude Code reports (`$0.42`, at API list prices, not what a subscription bills), and `lines`, the lines added and removed (`+156 −23`). `--hide` lists keep them off, so no existing bar changes.
 - `--config` has a Default preset (everything except the opt-in segments) next to Full, Minimal and Limits only.
+- The README lists everything claude-code-bar accesses (environment variables, files, programs, network), so package scanner alerts such as Socket's can be checked against it, and shows an npm provenance badge.
 - `--install` and `--config` warn when the statusLine runs claude-code-bar through npx, pnpm or yarn, which resolve the package on every refresh (0.2–0.6 s, against 0.03 s installed). The README recommends a global install.
 
 ### Changed
