@@ -116,3 +116,25 @@ test("an unknown context size shows a dash, not 0%", () => {
   // 0 is a real value
   assert.match(render(["--no-color"], data({ contextPct: 0 })).head, /🧠 0%/);
 });
+
+test("cost, lines and git ahead/behind", () => {
+  const d = data({ costUsd: 1.234, lines: { added: 156, removed: 23 }, git: { branch: "main", dirty: true, ahead: 2, behind: 1 } });
+  assert.equal(render(["--add=cost,lines", "--no-color"], d).head, "🤖 Opus 5.5 │ 🧠 30% │ ⏱️ 2m14s │ demo │ main* ⇡2⇣1 │ $1.23 │ +156 −23");
+  // Hidden by default, and left out while there is nothing to show
+  assert.equal(render(["--no-color"], d).head, "🤖 Opus 5.5 │ 🧠 30% │ ⏱️ 2m14s │ demo │ main* ⇡2⇣1");
+  const empty = data({ costUsd: null, lines: { added: 0, removed: 0 }, git: { branch: "dev", dirty: false, ahead: 0, behind: 3 } });
+  assert.equal(render(["--add=cost,lines", "--no-color"], empty).head, "🤖 Opus 5.5 │ 🧠 30% │ ⏱️ 2m14s │ demo │ dev ⇣3");
+});
+
+test("context as tokens", () => {
+  const d = data({ contextTokens: 46000, contextSize: 200000 });
+  const head = (flags, x = d) => render([...flags, "--no-color", "--hide=duration,dir,git,model"], x).head;
+  assert.equal(head(["--context=tokens"]), "🧠 46k/200k");
+  assert.equal(head(["--context=both"]), "🧠 30% (46k/200k)");
+  assert.equal(head(["--context=tokens", "--show=left"]), "🧠 154k left");
+  assert.equal(head(["--context=both", "--show=left"]), "🧠 70% left (154k)");
+  // Tokens come from the percentage when only the window size is known, and need a size
+  assert.equal(head(["--context=tokens"], data({ contextSize: 1_000_000 })), "🧠 300k/1M");
+  assert.equal(head(["--context=tokens"], data({ contextSize: null })), "🧠 30%");
+  assert.equal(head(["--context=both"], data({ contextPct: null, contextSize: 200000 })), "🧠 –");
+});

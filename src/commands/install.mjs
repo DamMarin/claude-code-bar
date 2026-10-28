@@ -1,5 +1,6 @@
 import { serializeOptions } from "../core/options.mjs";
 import { STATUS_LINE, buildCommand, commandExecutable, isOwnStatusLine, splitCommand } from "../core/status-line.mjs";
+import { basename } from "node:path";
 import { canRun } from "../io/executable.mjs";
 import { BACKUP_PATH, SettingsError, readSettings, writeStatusLine } from "../io/settings-file.mjs";
 
@@ -10,6 +11,21 @@ export function warnReplaced(replaced) {
     `⚠️  Replaced your existing statusLine ${described}.\n` +
     `   A copy was saved to ${BACKUP_PATH}\n` +
     "   and will be restored by `claude-code-bar --uninstall`."
+  );
+}
+
+// Runners that resolve the package again on every run, so each refresh of the bar waits for them
+const SLOW_RUNNERS = ["npx", "pnpm", "yarn"];
+
+export function warnSlowRunner(command) {
+  const program = commandExecutable(command);
+  const runner = program && basename(program).replace(/\.(cmd|exe|ps1)$/i, "");
+  if (!SLOW_RUNNERS.includes(runner)) return;
+  console.warn(
+    `⚠️  The statusLine runs claude-code-bar through ${runner}, which resolves the package on every refresh:\n` +
+    "   about 0.2 s each time, and 0.6 s or more with @latest, which also asks the npm registry.\n" +
+    "   For a faster bar: npm install -g claude-code-bar && claude-code-bar --install\n" +
+    "   claude-code-bar tells you about new versions itself (the ↑ update notice)."
   );
 }
 
@@ -38,6 +54,7 @@ export async function install(options = null) {
     process.exit(1);
   }
   warnReplaced(replaced);
+  warnSlowRunner(command);
 
   // Check that the program the command starts with can be found: claude-code-bar itself,
   // or e.g. npx, pnpm or node when the command runs it through one of those

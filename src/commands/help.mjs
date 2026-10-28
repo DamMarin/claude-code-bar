@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { BAR_STYLES, SEGMENTS, SEPARATORS, THEMES } from "../core/options.mjs";
+import { BAR_STYLES, OPT_IN, SEGMENTS, SEPARATORS, THEMES } from "../core/options.mjs";
 import { bannerLines } from "../core/banner.mjs";
 
 // The logo is for --help and manual runs; error messages use the plain title
@@ -23,7 +23,9 @@ Display options (use with --install, or let --config write them for you):
   --theme=<name>          ${Object.keys(THEMES).join(", ")}
   --colors=<role:color>   Custom colors for low, medium, high and accent, e.g. low:cyan,high:bright-red
   --thresholds=<m>,<h>    Percentages where colors switch to medium and high (default 50,80)
-  --hide=<names>          Hide segments: ${SEGMENTS.join(", ")}
+  --hide=<names>          Hide segments: ${SEGMENTS.filter((key) => !OPT_IN.includes(key)).join(", ")}
+  --add=<names>           Show segments that are off by default: ${OPT_IN.join(", ")}
+  --context=<view>        Context as percent (default), tokens (46k/200k) or both
   --order=<names>         Order of the first line, e.g. git,model,context
   --layout=compact        Everything on one line, without bars
   --bar=<style>           ${Object.keys(BAR_STYLES).join(", ")}

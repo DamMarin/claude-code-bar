@@ -7,6 +7,18 @@ All notable changes to claude-code-bar are listed here. The format follows
 The release workflow publishes a version's section below as its GitHub release notes,
 so every release needs one.
 
+## [Unreleased]
+
+### Added
+- The git segment shows commits ahead of and behind the upstream: `main* ⇡2⇣1`.
+- `--context=tokens` shows the context as tokens out of the window size (`46k/200k`), and `--context=both` shows both (`30% (46k/200k)`). The percentage stays the default.
+- Two segments that are off by default, turned on with `--add` or in `--config`: `cost`, the estimated session cost Claude Code reports (`$0.42`, at API list prices, not what a subscription bills), and `lines`, the lines added and removed (`+156 −23`). `--hide` lists keep them off, so no existing bar changes.
+- `--config` has a Default preset (everything except the opt-in segments) next to Full, Minimal and Limits only.
+- `--install` and `--config` warn when the statusLine runs claude-code-bar through npx, pnpm or yarn, which resolve the package on every refresh (0.2–0.6 s, against 0.03 s installed). The README recommends a global install.
+
+### Changed
+- Git info comes from one `git status --porcelain=v2 --branch`, run without a shell, instead of two or three commands through one.
+
 ## [1.1.0] - 2026-10-24
 
 **Requires Node 22 or newer.** 1.0.0 ran on Node 18; Node 18 and 20 are past end of life.
