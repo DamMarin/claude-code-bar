@@ -20,7 +20,7 @@ test("hide a segment and move another", () => {
   const menu = fresh();
   press(menu, "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", " ");
   press(menu, "ArrowDown", "m", "ArrowUp", "ArrowUp", "ArrowUp", "Enter");
-  assert.deepEqual(serializeOptions(menu.options()), ["--hide=dir", "--order=model,git,context,duration,dir,update"]);
+  assert.deepEqual(serializeOptions(menu.options()), ["--hide=dir", "--order=model,git,context,duration,dir,cost,lines,update"]);
   assert.match(plain(menu.frame(80, 40)), /● 2 changes/);
 });
 
@@ -101,4 +101,22 @@ test("small terminals drop the logo before the preview", () => {
 
   const tiny = plain(fresh().frame(80, 20));
   assert.match(tiny, /more lines, press p to show them/);
+});
+
+test("cost and lines start hidden and are shown with space", () => {
+  const menu = fresh();
+  assert.match(plain(menu.frame(80, 40)), /Preset +‹ Default ›/);
+  assert.match(plain(menu.frame(80, 40)), /○ {2}Cost/);
+  press(menu, ...Array(6).fill("ArrowDown"), " ", "ArrowDown", " ");
+  assert.deepEqual(serializeOptions(menu.options()), ["--add=cost,lines"]);
+  assert.match(plain(menu.frame(80, 40)), /┃ .* \$0\.42 │ \+156 −23/);
+  press(menu, "r");
+  assert.deepEqual(serializeOptions(menu.options()), ["--add=cost"]);
+});
+
+test("the Layout tab sets how context is counted", () => {
+  const menu = fresh();
+  press(menu, "4", "ArrowDown", "ArrowRight");
+  assert.deepEqual(serializeOptions(menu.options()), ["--context=tokens"]);
+  assert.match(plain(menu.frame(80, 40)), /🧠 60k\/200k/);
 });

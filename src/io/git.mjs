@@ -1,11 +1,14 @@
-import { execSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { stripControl } from "../core/sanitize.mjs";
 import { readCacheJson, writeCacheJson } from "./files.mjs";
 
 const CACHE_TTL_MS = 5000;
-const MAX_BUFFER = 64 * 1024; // 64 KB — plenty for branch names; a bigger status just means dirty
-const EXEC_OPTS = { encoding: "utf8", timeout: 2000, maxBuffer: MAX_BUFFER, stdio: ["pipe", "pipe", "pipe"] };
+const MAX_BUFFER = 64 * 1024; // 64 KB — plenty for the branch headers; a bigger status just means dirty
+// git runs directly, without a shell in between
+const EXEC_OPTS = { encoding: "utf8", timeout: 2000, maxBuffer: MAX_BUFFER, stdio: ["ignore", "pipe", "ignore"] };
+
+const git = (cwd, args) => spawnSync("git", args, { ...EXEC_OPTS, cwd });
 
 function isValidCache(cache) {
   return cache
@@ -14,18 +17,48 @@ function isValidCache(cache) {
     && typeof cache.timestamp === "number"
     && typeof cache.branch === "string"
     && typeof cache.dirty === "boolean"
+    && Number.isInteger(cache.ahead)
+    && Number.isInteger(cache.behind)
     && cache.branch.length > 0
     && cache.branch.length < 256;
 }
 
-// A status that overflows the buffer still means there are changes. A timeout counts
-// as clean, so a slow repo loses only the "*", never the branch.
-function isDirty(cwd) {
-  try {
-    return execSync("git status --porcelain", { ...EXEC_OPTS, cwd }).trim().length > 0;
-  } catch (err) {
-    return err.code === "ENOBUFS";
+/**
+ * Reads `git status --porcelain=v2 --branch`: the branch (or the short commit on a
+ * detached HEAD), commits ahead of and behind the upstream, and whether anything changed.
+ * Returns null without a branch header, e.g. outside a repository.
+ */
+export function parseStatus(text) {
+  let head = null;
+  let oid = null;
+  let ahead = 0;
+  let behind = 0;
+  let dirty = false;
+  for (const line of String(text ?? "").split("\n")) {
+    if (line.startsWith("# branch.head ")) head = line.slice(14).trim();
+    else if (line.startsWith("# branch.oid ")) oid = line.slice(13).trim();
+    else if (line.startsWith("# branch.ab ")) {
+      const match = /^\+(\d+) -(\d+)$/.exec(line.slice(12).trim());
+      if (match) [ahead, behind] = [Number(match[1]), Number(match[2])];
+    } else if (line.trim() && !line.startsWith("#")) dirty = true;
   }
+  const branch = head && head !== "(detached)" ? head : oid && oid !== "(initial)" ? oid.slice(0, 7) : null;
+  return branch ? { branch, dirty, ahead, behind } : null;
+}
+
+// A status that timed out still tells the branch, so a slow repo loses only the "*"
+function branchOnly(cwd) {
+  const name = git(cwd, ["branch", "--show-current"]).stdout?.trim()
+    || git(cwd, ["rev-parse", "--short", "HEAD"]).stdout?.trim();
+  return name ? { branch: name, dirty: false, ahead: 0, behind: 0 } : null;
+}
+
+function readStatus(cwd) {
+  const result = git(cwd, ["status", "--porcelain=v2", "--branch"]);
+  // A status that overflows the buffer still has its headers, and means there are changes
+  const status = parseStatus(result.stdout);
+  if (status) return result.error?.code === "ENOBUFS" ? { ...status, dirty: true } : status;
+  return result.error?.code === "ETIMEDOUT" ? branchOnly(cwd) : null;
 }
 
 // One cache file per working directory, so concurrent sessions don't evict each other
@@ -41,28 +74,18 @@ export function getGitInfo(cwd) {
   // Try cache first
   const cache = readCacheJson(cacheName);
   if (isValidCache(cache) && cache.cwd === cwd && (Date.now() - cache.timestamp) < CACHE_TTL_MS) {
-    return { branch: cache.branch, dirty: cache.dirty };
+    return { branch: cache.branch, dirty: cache.dirty, ahead: cache.ahead, behind: cache.behind };
   }
 
-  // Run git commands
-  try {
-    let branch = stripControl(execSync("git branch --show-current", { ...EXEC_OPTS, cwd }).trim());
+  const status = readStatus(cwd);
+  if (!status) return null;
 
-    // Detached HEAD — fall back to short commit hash
-    if (!branch) {
-      branch = stripControl(execSync("git rev-parse --short HEAD", { ...EXEC_OPTS, cwd }).trim());
-      if (!branch) return null;
-    }
+  // Clamp branch name length for display safety
+  let branch = stripControl(status.branch);
+  if (!branch) return null;
+  if (branch.length > 64) branch = branch.slice(0, 61) + "...";
 
-    // Clamp branch name length for display safety
-    if (branch.length > 64) branch = branch.slice(0, 61) + "...";
-
-    const result = { branch, dirty: isDirty(cwd) };
-
-    writeCacheJson(cacheName, { timestamp: Date.now(), cwd, ...result });
-
-    return result;
-  } catch {
-    return null;
-  }
+  const result = { ...status, branch };
+  writeCacheJson(cacheName, { timestamp: Date.now(), cwd, ...result });
+  return result;
 }

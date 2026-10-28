@@ -35,6 +35,13 @@ export async function loadRateLimits(data, hidden, { usage = fetchUsage } = {}) 
   return limits;
 }
 
+// Lines added and removed this session, or null when Claude Code sent neither
+function readLines(cost) {
+  const added = safeNumber(cost?.total_lines_added, null, 0);
+  const removed = safeNumber(cost?.total_lines_removed, null, 0);
+  return added === null && removed === null ? null : { added: added ?? 0, removed: removed ?? 0 };
+}
+
 export async function render(options = DEFAULT_OPTIONS) {
   try {
     const data = await readStdin();
@@ -47,7 +54,11 @@ export async function render(options = DEFAULT_OPTIONS) {
     const status = {
       model: stripControl(safeString(data?.model?.display_name, null) || safeString(readDefaultModel(), "unknown")),
       contextPct: safeNumber(data?.context_window?.used_percentage, null, 0, 100), // null until known
+      contextTokens: safeNumber(data?.context_window?.total_input_tokens, null, 0),
+      contextSize: safeNumber(data?.context_window?.context_window_size, null, 0),
       durationMs: safeNumber(data?.cost?.total_duration_ms, 0, 0),
+      costUsd: safeNumber(data?.cost?.total_cost_usd, null, 0),
+      lines: readLines(data?.cost),
       dir: stripControl(basename(cwd)),
       git: hidden.has("git") ? null : getGitInfo(cwd),
       update: hidden.has("update") ? null : stripControl(getUpdateInfo()?.latest ?? "") || null,

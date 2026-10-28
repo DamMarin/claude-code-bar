@@ -39,7 +39,7 @@ Claude Code doesn’t show everything you need in one place.
 * **Context usage** → avoid hitting limits mid-task
 * **Rate limits** → no more guessing or checking dashboards
 * **Extra usage spend** → see how much of your overage budget you’ve burned, in real money
-* **Git state** → always know your branch and dirty status
+* **Git state** → always know your branch, dirty status and unpushed commits
 * **Session duration** → track how long you've been working
 * **Model** → see exactly what you're running
 
@@ -53,7 +53,9 @@ All in one clean status bar.
 * 5-hour & 7-day rate limits
 * Sonnet-specific usage tracking
 * Extra usage spend (e.g. `€15.60 / €85`) with currency from your account
-* Git branch and dirty indicator
+* Git branch, dirty indicator and commits ahead of / behind the upstream (`main* ⇡2⇣1`)
+* Context in tokens if you prefer (`46k/200k`)
+* Session cost and lines changed, if you turn them on (`$0.42`, `+156 −23`)
 * Session duration
 * Model name
 * Themes, bar styles and a one-line layout — pick them in an interactive menu
@@ -99,6 +101,8 @@ Your choices are stored as flags in the `statusLine` command, so you can also se
 | `--colors=<role:color,…>` | Your own colors for `low`, `medium`, `high` and `accent`, from the 16 terminal colors |
 | `--thresholds=<m>,<h>` | Where colors switch to medium and high (default `50,80`) |
 | `--hide=<names>` | Hide `model`, `context`, `duration`, `dir`, `git`, `update`, `5h`, `7d`, `sonnet`, `extra` |
+| `--add=<names>` | Show segments that are off by default: `cost` (estimated session cost at API list prices, not what a subscription bills) and `lines` (lines added and removed) |
+| `--context=<view>` | `percent` (default), `tokens` (`46k/200k`) or `both` |
 | `--order=<names>` | Order of the first line, e.g. `git,model,context` |
 | `--layout=compact` | Everything on one line, without bars |
 | `--bar=<style>` | `shade` ▓░, `block` █░, `line` ━─, `dots` ●○, `squares` ■□, `braille` ⣿⣀ |
@@ -151,7 +155,7 @@ File: `~/.claude/settings.json`
 
 Add [display options](#-customize) to `command`, e.g. `"claude-code-bar --theme=ocean --no-emoji"`.
 
-The command can also run claude-code-bar through a package runner (`npx claude-code-bar@latest`, `pnpm dlx`, `yarn dlx`, `bunx`), from a quoted path with spaces (`"/Users/John Doe/bin/claude-code-bar"`), or with shell syntax after the options (`2>/dev/null`). `--install`, `--config` and `--uninstall` recognize all of these and change only the options.
+The command can also run claude-code-bar through a package runner (`npx claude-code-bar@latest`, `pnpm dlx`, `yarn dlx`, `bunx`), but a global install is faster: Claude Code runs the command on every refresh, and npx, pnpm and yarn resolve the package each time (about 0.2 s, and 0.6 s or more with `@latest`, which also asks the npm registry, against 0.03 s installed). `--install` and `--config` warn when the command uses one of them. It can also run from a quoted path with spaces (`"/Users/John Doe/bin/claude-code-bar"`), or with shell syntax after the options (`2>/dev/null`). `--install`, `--config` and `--uninstall` recognize all of these and change only the options.
 
 ---
 

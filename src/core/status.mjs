@@ -2,6 +2,7 @@ import { SEPARATORS } from "./options.mjs";
 import { formatDuration } from "./format-duration.mjs";
 import { formatMoney } from "./format-money.mjs";
 import { formatCountdown, formatReset } from "./format-reset.mjs";
+import { formatTokens } from "./format-tokens.mjs";
 import { barCells } from "./progress-bar.mjs";
 import { paint, resolvePalette, styleFor } from "./style.mjs";
 
@@ -11,7 +12,8 @@ const money = (e, joiner) => `${formatMoney(e.usedCredits, e.currency)}${joiner}
 /**
  * Renders the status bar.
  *
- * data: { model, contextPct (null until known), durationMs, dir, git: { branch, dirty } | null,
+ * data: { model, contextPct (null until known), contextTokens, contextSize, durationMs, dir,
+ *         git: { branch, dirty, ahead, behind } | null, costUsd | null, lines: { added, removed } | null,
  *         update: latest version | null,
  *         limits: { fiveHour, sevenDay, sevenDaySonnet, extraUsage } }
  *
@@ -43,14 +45,32 @@ export function renderStatus(data, options, { mark = [], noColor = false } = {})
 
   // Early in a session Claude Code doesn't know the context size yet: show "–", not 0%
   const ctx = data.contextPct === null || data.contextPct === undefined ? null : clamp(data.contextPct);
+  const contextText = () => {
+    const size = data.contextSize;
+    const used = Number.isFinite(data.contextTokens) ? data.contextTokens : size > 0 ? Math.round((ctx * size) / 100) : null;
+    // Without a window size there are no tokens to show, only the percentage
+    if (options.context === "percent" || !(size > 0) || used === null) return pctText(ctx);
+    const tokens = options.left ? `${formatTokens(Math.max(0, size - used))} left` : `${formatTokens(used)}/${formatTokens(size)}`;
+    if (options.context === "tokens") return tokens;
+    return options.left ? `${pctText(ctx)} (${formatTokens(Math.max(0, size - used))})` : `${pctText(ctx)} (${tokens})`;
+  };
+  const git = data.git
+    ? `${data.git.branch}${data.git.dirty ? "*" : ""}${data.git.ahead > 0 || data.git.behind > 0 ? " " : ""}`
+      + `${data.git.ahead > 0 ? `⇡${data.git.ahead}` : ""}${data.git.behind > 0 ? `⇣${data.git.behind}` : ""}`
+    : null;
+  const lines = data.lines && (data.lines.added > 0 || data.lines.removed > 0) ? data.lines : null;
   const parts = {
     model: (u) => label(emoji ? "🤖 " : "", u) + paint(accent, data.model, u || m("accent")),
     context: (u) => label(emoji ? "🧠 " : "ctx ", u) + (ctx === null
       ? paint({}, "–", u || m("pct"))
-      : paint(levelStyle(ctx), pctText(ctx), u || m("pct") || levelMarked(ctx))),
+      : paint(levelStyle(ctx), contextText(), u || m("pct") || levelMarked(ctx))),
     duration: (u) => label(emoji ? "⏱️ " : "", u) + paint({}, formatDuration(data.durationMs), u),
     dir: (u) => (data.dir ? paint({}, data.dir, u) : null),
-    git: (u) => (data.git ? paint(accent, `${data.git.branch}${data.git.dirty ? "*" : ""}`, u || m("accent")) : null),
+    git: (u) => (git ? paint(accent, git, u || m("accent")) : null),
+    cost: (u) => (Number.isFinite(data.costUsd) ? paint({}, formatMoney(Math.round(data.costUsd * 100), "USD"), u) : null),
+    lines: (u) => (lines
+      ? paint(styleFor(palette, "low"), `+${lines.added}`, u) + paint({}, " ", u) + paint(styleFor(palette, "high"), `−${lines.removed}`, u)
+      : null),
     update: (u) => (data.update ? paint(updateStyle, `↑ ${data.update}`, u || m("accent")) : null),
   };
   const line1 = options.order

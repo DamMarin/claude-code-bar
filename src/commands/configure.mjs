@@ -5,7 +5,7 @@ import { parseOptions, serializeOptions } from "../core/options.mjs";
 import { createMenu, plural } from "../core/menu.mjs";
 import { STATUS_LINE, buildCommand, isOwnStatusLine, splitCommand } from "../core/status-line.mjs";
 import { SettingsError, readSettings, writeStatusLine } from "../io/settings-file.mjs";
-import { warnReplaced } from "./install.mjs";
+import { warnReplaced, warnSlowRunner } from "./install.mjs";
 
 const CSI = "\x1b[";
 const KEY_NAMES = {
@@ -90,6 +90,7 @@ export async function configure({ stdin = process.stdin, stdout = process.stdout
       const replaced = writeStatusLine(command);
       console.log(`✅ Saved to ~/.claude/settings.json\n\n   ${command}\n`);
       warnReplaced(replaced);
+      warnSlowRunner(command);
       finish("   Restart Claude Code to apply.");
     } else if (action === "quit") {
       const changes = menu.changes();

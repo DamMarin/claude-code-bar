@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { formatDuration } from "../src/core/format-duration.mjs";
 import { formatMoney } from "../src/core/format-money.mjs";
 import { formatReset } from "../src/core/format-reset.mjs";
+import { formatTokens } from "../src/core/format-tokens.mjs";
 
 const HOUR = 60 * 60 * 1000;
 
@@ -38,4 +39,9 @@ test("formatReset", () => {
   assert.match(formatReset(new Date(Date.now() + 2 * HOUR)), /^\d{2}:\d{2}$/);
   assert.match(formatReset(new Date(Date.now() + 3 * 24 * HOUR)), /^(Mon|Tue|Wed|Thu|Fri|Sat|Sun)$/);
   assert.equal(formatReset(new Date(Date.now() + 9 * 24 * HOUR + 5.5 * HOUR)), "9d5h");
+});
+
+test("formatTokens", () => {
+  assert.deepEqual([0, 850, 9500, 15500, 46000, 999_400, 999_600, 1_000_000, 1_240_000, -1].map(formatTokens),
+    ["0", "850", "9.5k", "16k", "46k", "999k", "1M", "1M", "1.2M", "?"]);
 });

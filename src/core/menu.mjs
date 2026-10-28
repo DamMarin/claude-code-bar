@@ -1,7 +1,7 @@
 // The --config menu as pure state: keys go in, options and screen lines come out.
 // The terminal side (raw mode, drawing, saving) lives in commands/configure.mjs.
 import {
-  BAR_STYLES, DEFAULT_OPTIONS, FIRST_LINE, PALETTE, RATE_LIMITS, ROLES, SEGMENTS, SEPARATORS, THEMES,
+  BAR_STYLES, DEFAULT_OPTIONS, FIRST_LINE, OPT_IN, PALETTE, RATE_LIMITS, ROLES, SEGMENTS, SEPARATORS, THEMES,
   applyTheme, cloneOptions, roleColor, toCustom,
 } from "./options.mjs";
 import { renderStatus } from "./status.mjs";
@@ -36,7 +36,9 @@ const SEGMENT_INFO = {
   context: ["Context", "30%", "How full the context window is, colored by level."],
   duration: ["Duration", "2m14s", "How long this session has been running."],
   dir: ["Directory", "my-project", "The folder Claude Code runs in. Hide it if you share screenshots."],
-  git: ["Git branch", "main*", "Current branch, with * when there are uncommitted changes."],
+  git: ["Git branch", "main* ⇡2", "Current branch, with * when there are uncommitted changes and ⇡⇣ for commits ahead of or behind its upstream."],
+  cost: ["Cost", "$0.42", "Estimated session cost at API list prices, as Claude Code computes it. Not what a subscription bills."],
+  lines: ["Lines changed", "+156 −23", "Lines of code added and removed in this session."],
   update: ["Update notice", "↑ new version", "Appears only when a newer claude-code-bar is published."],
   "5h": ["5-hour", "34%", "Usage of the 5-hour rate limit window."],
   "7d": ["7-day", "63%", "Usage of the weekly limit."],
@@ -45,8 +47,9 @@ const SEGMENT_INFO = {
 };
 
 const PRESETS = [
+  ["default", "Default", [...OPT_IN]],
   ["full", "Full", []],
-  ["minimal", "Minimal", ["duration", "dir", "update", "sonnet", "extra"]],
+  ["minimal", "Minimal", ["duration", "dir", ...OPT_IN, "update", "sonnet", "extra"]],
   ["limits", "Limits only", [...FIRST_LINE]],
 ];
 
@@ -58,9 +61,13 @@ export function sampleStatus(now = Date.now()) {
   return {
     model: "Opus 4.6",
     contextPct: 30,
+    contextTokens: 60000,
+    contextSize: 200000,
     durationMs: 134000,
     dir: "my-project",
-    git: { branch: "main", dirty: true },
+    git: { branch: "main", dirty: true, ahead: 2, behind: 0 },
+    costUsd: 0.42,
+    lines: { added: 156, removed: 23 },
     update: "9.9.9",
     limits: {
       fiveHour: { percentage: 34, resetsAt: at(130) },
@@ -84,7 +91,7 @@ function rowsFor(tab, o) {
     const allRatesHidden = RATE_LIMITS.every((k) => o.hidden.includes(k));
     return [
       choice({
-        label: "Preset", defaultValue: "full", mark: [],
+        label: "Preset", defaultValue: "default", mark: [],
         desc: "Start from a ready-made selection, then fine-tune the list below.",
         options: () => [...PRESETS.map(([id, label]) => [id, label]), ...(presetOf(o) === "custom" ? [["custom", "Custom"]] : [])],
         get: () => presetOf(o),
@@ -181,6 +188,12 @@ function rowsFor(tab, o) {
       get: () => o.layout, set: (v) => { o.layout = v; },
     }),
     choice({
+      label: "Context", defaultValue: "percent", mark: ["context"],
+      desc: "How the context segment counts: a percentage, tokens out of the window size, or both.",
+      options: () => [["percent", "30%"], ["tokens", "60k/200k"], ["both", "30% (60k/200k)"]],
+      get: () => o.context, set: (v) => { o.context = v; },
+    }),
+    choice({
       label: "Separator", defaultValue: "pipe", mark: ["sep"],
       desc: "The character between segments.",
       options: () => Object.entries(SEPARATORS).map(([id, s]) => [id, `${s.glyph}  ${id}`]),
@@ -203,20 +216,23 @@ export function countChanges(a, b) {
   for (const key of SEGMENTS) if (a.hidden.includes(key) !== b.hidden.includes(key)) n++;
   if (a.order.join() !== b.order.join()) n++;
   if (colorsOf(a) !== colorsOf(b)) n++;
-  for (const key of ["thMedium", "thHigh", "bar", "barWidth", "left", "countdown", "layout", "sep", "emoji"]) {
+  for (const key of ["thMedium", "thHigh", "bar", "barWidth", "left", "countdown", "context", "layout", "sep", "emoji"]) {
     if (a[key] !== b[key]) n++;
   }
   return n;
 }
 
 function isDefaultRow(row, o) {
-  if (row.type === "segment") return !o.hidden.includes(row.key);
+  if (row.type === "segment") return o.hidden.includes(row.key) === DEFAULT_OPTIONS.hidden.includes(row.key);
   if (row.type === "theme") return row.id !== o.theme || o.theme === "default";
   return row.get() === row.defaultValue;
 }
 
 function resetRow(row, o) {
-  if (row.type === "segment") o.hidden = o.hidden.filter((k) => k !== row.key);
+  if (row.type === "segment") {
+    o.hidden = o.hidden.filter((k) => k !== row.key);
+    if (DEFAULT_OPTIONS.hidden.includes(row.key)) o.hidden.push(row.key);
+  }
   else if (row.type === "theme") applyTheme(o, "default");
   else row.set(row.defaultValue);
 }

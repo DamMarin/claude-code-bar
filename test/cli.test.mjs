@@ -266,8 +266,10 @@ test("install keeps a package runner command and uninstall removes it", (t) => {
   const command = () => JSON.parse(readFileSync(settingsPath, "utf8")).statusLine?.command;
   writeFileSync(settingsPath, JSON.stringify({ statusLine: { type: "command", command: "pnpm dlx claude-code-bar@latest --hide=dir" } }));
 
-  assert.equal(run(home, ["--install", "--theme=ocean"]).status, 0);
+  const installed = run(home, ["--install", "--theme=ocean"]);
+  assert.equal(installed.status, 0);
   assert.equal(command(), "pnpm dlx claude-code-bar@latest --theme=ocean");
+  assert.match(installed.stderr, /runs claude-code-bar through pnpm, which resolves the package on every refresh/);
   assert.ok(!existsSync(join(home, ".claude", "claude-code-bar.statusline-backup.json")));
 
   const result = run(home, ["--uninstall"]);
@@ -574,4 +576,51 @@ test("render shows a dash while the context size is unknown", (t) => {
     assert.equal(run(home, args, input).stdout, "🤖 Opus │ 🧠 –\n");
   }
   assert.equal(run(home, args, '{"model":{"display_name":"Opus"},"context_window":{"used_percentage":0}}').stdout, "🤖 Opus │ 🧠 0%\n");
+});
+
+test("parseStatus reads branch, upstream distance and changes", async () => {
+  const { parseStatus } = await import("../src/io/git.mjs");
+  assert.deepEqual(parseStatus("# branch.oid abc1234def\n# branch.head main\n# branch.upstream origin/main\n# branch.ab +2 -1\n"),
+    { branch: "main", dirty: false, ahead: 2, behind: 1 });
+  assert.deepEqual(parseStatus("# branch.oid abc1234def\n# branch.head (detached)\n1 .M N... 100644 100644 100644 a b f.txt\n"),
+    { branch: "abc1234", dirty: true, ahead: 0, behind: 0 });
+  assert.deepEqual(parseStatus("# branch.oid (initial)\n# branch.head main\n? new.txt\n"), { branch: "main", dirty: true, ahead: 0, behind: 0 });
+  assert.equal(parseStatus(""), null);
+});
+
+test("render shows commits ahead of the upstream", (t) => {
+  const home = makeHome(t);
+  const root = mkdtempSync(join(tmpdir(), "ccb-repo-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const remote = join(root, "remote.git");
+  const cwd = join(root, "work");
+  const git = (...args) => spawnSync("git", ["-c", "user.name=t", "-c", "user.email=t@t", ...args], { cwd: root });
+  git("init", "-q", "--bare", "-b", "main", remote);
+  git("clone", "-q", remote, cwd);
+  git("-C", cwd, "commit", "-q", "--allow-empty", "-m", "one");
+  git("-C", cwd, "push", "-q", "-u", "origin", "main");
+  git("-C", cwd, "commit", "-q", "--allow-empty", "-m", "two");
+
+  const input = JSON.stringify({ workspace: { current_dir: cwd } });
+  const result = run(home, ["--hide=model,context,duration,dir,update,5h,7d,sonnet,extra", "--no-color"], input);
+  assert.equal(result.stdout, "main ⇡1\n");
+});
+
+test("render shows cost and lines when added", (t) => {
+  const home = makeHome(t);
+  const input = JSON.stringify({ cost: { total_cost_usd: 0.4217, total_lines_added: 156, total_lines_removed: 23 } });
+  const result = run(home, ["--hide=model,context,duration,dir,git,update,5h,7d,sonnet,extra", "--add=cost,lines", "--no-color"], input);
+  assert.equal(result.stdout, "$0.42 │ +156 −23\n");
+});
+
+test("install warns about slow package runners only", (t) => {
+  const home = makeHome(t);
+  const settingsPath = join(home, ".claude", "settings.json");
+  const install = (command) => {
+    writeFileSync(settingsPath, JSON.stringify({ statusLine: { type: "command", command } }));
+    return run(home, ["--install"]).stderr;
+  };
+  assert.match(install("npx -y claude-code-bar@latest"), /through npx/);
+  assert.doesNotMatch(install("bunx claude-code-bar"), /resolves the package/);
+  assert.doesNotMatch(install("claude-code-bar"), /resolves the package/);
 });

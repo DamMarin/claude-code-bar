@@ -37,7 +37,9 @@ export const SEPARATORS = {
   arrow: { glyph: "›", joiner: " › " },
 };
 
-export const FIRST_LINE = ["model", "context", "duration", "dir", "git", "update"];
+export const FIRST_LINE = ["model", "context", "duration", "dir", "git", "cost", "lines", "update"];
+// Segments that stay hidden until --add turns them on, so new ones never change a bar that works
+export const OPT_IN = ["cost", "lines"];
 export const RATE_LIMITS = ["5h", "7d", "sonnet", "extra"];
 export const SEGMENTS = [...FIRST_LINE, ...RATE_LIMITS];
 
@@ -53,7 +55,7 @@ export const DEFAULT_OPTIONS = Object.freeze({
   thMedium: 50,
   thHigh: 80,
   emoji: true,
-  hidden: Object.freeze([]),
+  hidden: Object.freeze([...OPT_IN]),
   order: Object.freeze([...FIRST_LINE]),
   layout: "lines",
   bar: "shade",
@@ -61,6 +63,7 @@ export const DEFAULT_OPTIONS = Object.freeze({
   sep: "pipe",
   left: false,
   countdown: false,
+  context: "percent",
 });
 
 export function cloneOptions(options) {
@@ -128,7 +131,13 @@ const VALUE_OPTIONS = {
   hide: (options, value) => {
     const { items, error } = parseList(value, SEGMENTS, "hide");
     if (error) return error;
-    options.hidden = SEGMENTS.filter((key) => items.includes(key));
+    // --hide lists the always-on segments; opt-in ones keep what --add gave them
+    options.hidden = SEGMENTS.filter((key) => items.includes(key) || (OPT_IN.includes(key) && options.hidden.includes(key)));
+  },
+  add: (options, value) => {
+    const { items, error } = parseList(value, OPT_IN, "add");
+    if (error) return error;
+    options.hidden = options.hidden.filter((key) => !items.includes(key));
   },
   order: (options, value) => {
     const { items, error } = parseList(value, FIRST_LINE, "order");
@@ -148,6 +157,7 @@ const VALUE_OPTIONS = {
   separator: oneOf("separator", Object.keys(SEPARATORS), (o, v) => { o.sep = v; }),
   show: oneOf("show", ["used", "left"], (o, v) => { o.left = v === "left"; }),
   reset: oneOf("reset", ["clock", "countdown"], (o, v) => { o.countdown = v === "countdown"; }),
+  context: oneOf("context", ["percent", "tokens", "both"], (o, v) => { o.context = v; }),
 };
 
 const SWITCH_OPTIONS = {
@@ -193,7 +203,10 @@ export function serializeOptions(options) {
   }
   if (options.thMedium !== d.thMedium || options.thHigh !== d.thHigh) flags.push(`--thresholds=${options.thMedium},${options.thHigh}`);
   if (!options.emoji) flags.push("--no-emoji");
-  if (options.hidden.length) flags.push(`--hide=${SEGMENTS.filter((k) => options.hidden.includes(k)).join(",")}`);
+  const hide = SEGMENTS.filter((k) => !OPT_IN.includes(k) && options.hidden.includes(k));
+  const add = OPT_IN.filter((k) => !options.hidden.includes(k));
+  if (hide.length) flags.push(`--hide=${hide.join(",")}`);
+  if (add.length) flags.push(`--add=${add.join(",")}`);
   if (options.layout !== d.layout) flags.push(`--layout=${options.layout}`);
   if (options.order.join() !== d.order.join()) flags.push(`--order=${options.order.join(",")}`);
   if (options.bar !== d.bar) flags.push(`--bar=${options.bar}`);
@@ -201,5 +214,6 @@ export function serializeOptions(options) {
   if (options.sep !== d.sep) flags.push(`--separator=${options.sep}`);
   if (options.left) flags.push("--show=left");
   if (options.countdown) flags.push("--reset=countdown");
+  if (options.context !== d.context) flags.push(`--context=${options.context}`);
   return flags;
 }
