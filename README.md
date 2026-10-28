@@ -1,5 +1,8 @@
 # claude-code-bar
 
+[![npm](https://img.shields.io/npm/v/claude-code-bar)](https://www.npmjs.com/package/claude-code-bar)
+[![npm provenance](https://img.shields.io/badge/npm-provenance-2ea44f?logo=npm)](https://www.npmjs.com/package/claude-code-bar#provenance)
+
 Never lose track of Claude Code context usage, rate limits, and git state - all in your terminal.
 
 > No dependencies. No config needed. Just drop it in.
@@ -226,6 +229,30 @@ Run it directly in Terminal, iTerm or a similar app, not through a pipe or a scr
 * 5-second hard timeout
 * A mistyped option is skipped, never breaks the bar
 * `NO_COLOR` is respected
+* Published from GitHub Actions with [npm provenance](https://docs.npmjs.com/generating-provenance-statements): npm shows which commit and workflow built each version
+
+### What it accesses
+
+Package scanners such as [Socket](https://socket.dev/npm/package/claude-code-bar) flag environment variable, filesystem, process and network access. This is all of it, so you can check each alert against the code:
+
+| Kind | What | Why |
+| --- | --- | --- |
+| Environment variables | `CLAUDE_CODE_OAUTH_TOKEN` | The login token for the usage API, when set (see [Network and credentials](#network-and-credentials)) |
+| | `NO_COLOR` | Turns colors off |
+| | `PATH`, `PATHEXT` | `--install` checks that the statusLine program can be found |
+| Files it reads | `~/.claude/settings.json` | The statusLine to install or change, and the default model when Claude Code sends none |
+| | `~/.claude/.credentials.json` | The login token, when it is not in the keychain |
+| | Modification times of `~/.claude/.credentials.json`, `~/Library/Keychains/login.keychain-db` and `~/.local/share/keyrings/login.keyring` | Only the time, never the contents: a change means a new login, so the cached usage is dropped |
+| Files it writes | `~/.claude/settings.json` | Only with `--install`, `--config` or `--uninstall`, and only the `statusLine` |
+| | `~/.claude/claude-code-bar.statusline-backup.json` | The statusLine it replaced, restored by `--uninstall` |
+| | `~/.cache/claude-code-bar/` | Caches: usage (a minute), git per folder (5 seconds), the latest version (a day). The token itself is never stored, only a short hash of `CLAUDE_CODE_OAUTH_TOKEN` to notice a change of login |
+| Programs it runs | `git` | Branch, changes and commits ahead/behind, in the folder Claude Code runs in |
+| | `security` (macOS), `secret-tool` (Linux) | Reads the Claude Code login token from the keychain |
+| | `node` | The once-a-day update check, in the background, so it never slows the bar |
+| Network | `api.anthropic.com` | The usage API, with your login token |
+| | `registry.npmjs.org` | The latest version number, without anything about you |
+
+Hide every rate limit (`--hide=5h,7d,sonnet,extra`) and no token is read and nothing is sent to Anthropic. Hide `update` and the bar never asks the npm registry (`--version` still does, when you run it). Hide `git` and `git` never runs.
 
 ---
 
