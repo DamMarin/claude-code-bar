@@ -1,0 +1,11 @@
+# The package has no dependencies, so only the pinned GitHub Actions need updates
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      actions:
+        patterns:
+          - "*"
