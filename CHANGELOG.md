@@ -19,6 +19,7 @@ so every release needs one.
 
 ### Changed
 - Git info comes from one `git status --porcelain=v2 --branch`, run without a shell, instead of two or three commands through one.
+- The login token is read from the macOS keychain (`security`) and the Linux secret store (`secret-tool`) without a shell in between. claude-code-bar no longer runs anything through a shell.
 
 ## [1.1.0] - 2026-10-24
 

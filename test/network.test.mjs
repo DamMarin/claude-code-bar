@@ -70,6 +70,29 @@ test("fetchUsage sends the login token and parses the answer", async () => {
   assert.ok(calls[0].init.signal instanceof AbortSignal);
 });
 
+test("the keychain token is read without a shell, the service name as one argument", { skip: process.platform === "win32" && "no sh scripts" }, async (t) => {
+  const bin = join(home, "keychain-bin");
+  const argsFile = join(home, "security-args.txt");
+  mkdirSync(bin, { recursive: true });
+  // A stand-in `security` that records its arguments, one per line, and prints the credentials
+  const credentials = JSON.stringify({ claudeAiOauth: { accessToken: "sk-ant-oat01-keychain-token" } });
+  writeFileSync(join(bin, "security"), `#!/bin/sh\nprintf '%s\\n' "$@" > '${argsFile}'\necho '${credentials}'\n`, { mode: 0o755 });
+
+  const saved = { PATH: process.env.PATH, token: process.env.CLAUDE_CODE_OAUTH_TOKEN };
+  t.after(() => {
+    process.env.PATH = saved.PATH;
+    process.env.CLAUDE_CODE_OAUTH_TOKEN = saved.token;
+  });
+  process.env.PATH = bin;
+  delete process.env.CLAUDE_CODE_OAUTH_TOKEN;
+
+  const { request, calls } = answering(json(USAGE));
+  await fetchUsage({ request });
+  assert.equal(calls[0].init.headers.Authorization, "Bearer sk-ant-oat01-keychain-token");
+  assert.deepEqual(readFileSync(argsFile, "utf8").split("\n").filter(Boolean),
+    ["find-generic-password", "-s", "Claude Code-credentials", "-w"]);
+});
+
 test("fetchUsage answers from the cache for a minute", async () => {
   const first = await fetchUsage(answering(json(USAGE)));
   assert.equal(readCache(USAGE_CACHE).ttl, 60_000);

@@ -1,7 +1,7 @@
 // Rate limits from the Claude Code OAuth usage API, with the login token.
 // The endpoint is not a public, documented API: it can change or disappear without notice.
 // Every failure just hides the limits, and Claude Code's own stdin data is preferred anyway.
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
@@ -15,6 +15,7 @@ const RATE_LIMITED_TTL_MS = 5 * 60000; // HTTP 429
 const GONE_TTL_MS = 60 * 60000; // HTTP 404 or 410: the endpoint may have been removed
 const MAX_RETRY_AFTER_MS = 30 * 60000;
 const MAX_BUFFER = 16 * 1024; // 16 KB — credentials JSON is small
+// The keychain tools run directly, without a shell in between
 const EXEC_OPTS = { encoding: "utf8", timeout: 2000, maxBuffer: MAX_BUFFER, stdio: ["pipe", "pipe", "pipe"] };
 const MAX_RESPONSE_BYTES = 64 * 1024; // 64 KB — reject oversized API responses
 
@@ -69,8 +70,8 @@ function resolveToken() {
 
   // 2. macOS Keychain
   try {
-    const raw = execSync(
-      'security find-generic-password -s "Claude Code-credentials" -w',
+    const raw = execFileSync(
+      "security", ["find-generic-password", "-s", "Claude Code-credentials", "-w"],
       EXEC_OPTS
     ).trim();
     const token = extractToken(raw);
@@ -86,8 +87,8 @@ function resolveToken() {
 
   // 4. Linux secret-tool
   try {
-    const raw = execSync(
-      'secret-tool lookup service "Claude Code-credentials"',
+    const raw = execFileSync(
+      "secret-tool", ["lookup", "service", "Claude Code-credentials"],
       EXEC_OPTS
     ).trim();
     const token = extractToken(raw);
