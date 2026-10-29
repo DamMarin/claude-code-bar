@@ -269,6 +269,8 @@ The public API is the set of commands (`--install`, `--uninstall`, `--config`, `
 
 ## 🧑‍💻 Development
 
+Bug reports, ideas and pull requests are welcome: see [CONTRIBUTING.md](./CONTRIBUTING.md).
+
 ```bash
 npm test
 npm run lint
