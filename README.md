@@ -57,7 +57,7 @@ All in one clean status bar.
 * Extra usage spend (e.g. `€15.60 / €85`) with currency from your account
 * Git branch, dirty indicator and commits ahead of / behind the upstream (`main* ⇡2⇣1`)
 * Context in tokens if you prefer (`46k/200k`)
-* Session cost and lines changed, if you turn them on (`$0.42`, `+156 −23`)
+* Reasoning effort, session cost and lines changed, if you turn them on (`🎚️ high`, `$0.42`, `+156 −23`)
 * Session duration
 * Model name
 * Themes, bar styles and a one-line layout — pick them in an interactive menu
@@ -103,7 +103,7 @@ Your choices are stored as flags in the `statusLine` command, so you can also se
 | `--colors=<role:color,…>` | Your own colors for `low`, `medium`, `high` and `accent`, from the 16 terminal colors |
 | `--thresholds=<m>,<h>` | Where colors switch to medium and high (default `50,80`) |
 | `--hide=<names>` | Hide `model`, `context`, `duration`, `dir`, `git`, `update`, `5h`, `7d`, `sonnet`, `extra` |
-| `--add=<names>` | Show segments that are off by default: `cost` (estimated session cost at API list prices, not what a subscription bills) and `lines` (lines added and removed) |
+| `--add=<names>` | Show segments that are off by default: `effort` (the reasoning effort level, e.g. `high`), `cost` (estimated session cost at API list prices, not what a subscription bills) and `lines` (lines added and removed) |
 | `--context=<view>` | `percent` (default), `tokens` (`46k/200k`) or `both` |
 | `--order=<names>` | Order of the first line, e.g. `git,model,context` |
 | `--layout=compact` | Everything on one line, without bars |

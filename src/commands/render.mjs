@@ -53,6 +53,7 @@ export async function render(options = DEFAULT_OPTIONS) {
     const cwd = safeString(data?.workspace?.current_dir, process.cwd());
     const status = {
       model: stripControl(safeString(data?.model?.display_name, null) || safeString(readDefaultModel(), "unknown")),
+      effort: stripControl(safeString(data?.effort?.level, "")) || null,
       contextPct: safeNumber(data?.context_window?.used_percentage, null, 0, 100), // null until known
       contextTokens: safeNumber(data?.context_window?.total_input_tokens, null, 0),
       contextSize: safeNumber(data?.context_window?.context_window_size, null, 0),

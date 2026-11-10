@@ -5,7 +5,7 @@ import { DEFAULT_OPTIONS, parseOptions, serializeOptions } from "../src/core/opt
 test("no flags gives the defaults", () => {
   const { options, errors } = parseOptions([]);
   assert.deepEqual(errors, []);
-  assert.deepEqual(options, { ...DEFAULT_OPTIONS, hidden: ["cost", "lines"], order: [...DEFAULT_OPTIONS.order] });
+  assert.deepEqual(options, { ...DEFAULT_OPTIONS, hidden: ["effort", "cost", "lines"], order: [...DEFAULT_OPTIONS.order] });
   assert.deepEqual(serializeOptions(options), []);
 });
 
@@ -19,9 +19,9 @@ test("parses every display flag", () => {
   assert.equal(options.accent, "bright-cyan");
   assert.deepEqual([options.thMedium, options.thHigh], [60, 90]);
   assert.equal(options.emoji, false);
-  assert.deepEqual(options.hidden, ["dir", "cost", "lines", "sonnet"]);
+  assert.deepEqual(options.hidden, ["effort", "dir", "cost", "lines", "sonnet"]);
   assert.equal(options.layout, "compact");
-  assert.deepEqual(options.order, ["git", "model", "context", "duration", "dir", "cost", "lines", "update"]);
+  assert.deepEqual(options.order, ["git", "model", "effort", "context", "duration", "dir", "cost", "lines", "update"]);
   assert.equal(options.bar, "braille");
   assert.equal(options.barWidth, 12);
   assert.equal(options.sep, "dot");
@@ -59,14 +59,14 @@ test("reports bad flags and keeps the rest", () => {
   assert.match(errors[7], /unknown role "glow"/);
   assert.match(errors[8], /Unknown option: stray/);
   assert.equal(options.theme, "default");
-  assert.deepEqual(options.hidden, ["cost", "lines"]);
+  assert.deepEqual(options.hidden, ["effort", "cost", "lines"]);
   assert.equal(options.bar, "dots");
 });
 
 test("serialize and parse round-trip", () => {
   const flags = [
     "--colors=low:cyan,medium:yellow,high:bright-red,accent:magenta", "--thresholds=40,85", "--no-emoji",
-    "--hide=update,extra", "--add=cost", "--layout=compact", "--order=dir,git,model,context,duration,cost,lines,update",
+    "--hide=update,extra", "--add=cost", "--layout=compact", "--order=dir,git,model,context,duration,cost,lines,update,effort",
     "--bar=line", "--bar-width=15", "--separator=slash", "--show=left", "--reset=countdown", "--context=both",
   ];
   const { options, errors } = parseOptions(flags);
@@ -74,15 +74,18 @@ test("serialize and parse round-trip", () => {
   assert.deepEqual(serializeOptions(options), flags);
 });
 
-test("cost and lines stay hidden until --add, in any flag order", () => {
-  assert.deepEqual(parseOptions(["--hide=dir"]).options.hidden, ["dir", "cost", "lines"]);
-  assert.deepEqual(parseOptions(["--add=lines", "--hide=dir"]).options.hidden, ["dir", "cost"]);
-  assert.deepEqual(parseOptions(["--hide=dir", "--add=cost,lines"]).options.hidden, ["dir"]);
-  assert.deepEqual(serializeOptions(parseOptions(["--add=lines,cost"]).options), ["--add=cost,lines"]);
-  assert.match(parseOptions(["--add=dir"]).errors[0], /--add: unknown name "dir". Use: cost, lines/);
+test("opt-in segments stay hidden until --add, in any flag order", () => {
+  assert.deepEqual(parseOptions(["--hide=dir"]).options.hidden, ["effort", "dir", "cost", "lines"]);
+  assert.deepEqual(parseOptions(["--add=lines", "--hide=dir"]).options.hidden, ["effort", "dir", "cost"]);
+  assert.deepEqual(parseOptions(["--hide=dir", "--add=cost,lines,effort"]).options.hidden, ["dir"]);
+  assert.deepEqual(serializeOptions(parseOptions(["--add=lines,cost,effort"]).options), ["--add=effort,cost,lines"]);
+  assert.match(parseOptions(["--add=dir"]).errors[0], /--add: unknown name "dir". Use: effort, cost, lines/);
   assert.match(parseOptions(["--context=words"]).errors[0], /--context: unknown value "words"/);
 });
 
-test("an order written before cost and lines existed puts them before update", () => {
-  assert.deepEqual(parseOptions(["--order=git,model"]).options.order, ["git", "model", "context", "duration", "dir", "cost", "lines", "update"]);
+test("segments an order leaves out follow it in their default order", () => {
+  assert.deepEqual(parseOptions(["--order=git,model"]).options.order, ["git", "model", "effort", "context", "duration", "dir", "cost", "lines", "update"]);
+  // An order saved before effort existed keeps its segments where they were and puts effort last
+  const saved = "--order=model,context,duration,dir,git,cost,lines,update";
+  assert.deepEqual(parseOptions([saved]).options.order, ["model", "context", "duration", "dir", "git", "cost", "lines", "update", "effort"]);
 });

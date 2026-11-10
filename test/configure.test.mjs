@@ -18,9 +18,9 @@ test("opens on Segments with every segment shown", () => {
 
 test("hide a segment and move another", () => {
   const menu = fresh();
-  press(menu, "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", " ");
+  press(menu, ...Array(5).fill("ArrowDown"), " ");
   press(menu, "ArrowDown", "m", "ArrowUp", "ArrowUp", "ArrowUp", "Enter");
-  assert.deepEqual(serializeOptions(menu.options()), ["--hide=dir", "--order=model,git,context,duration,dir,cost,lines,update"]);
+  assert.deepEqual(serializeOptions(menu.options()), ["--hide=dir", "--order=model,effort,git,context,duration,dir,cost,lines,update"]);
   assert.match(plain(menu.frame(80, 40)), /● 2 changes/);
 });
 
@@ -103,11 +103,16 @@ test("small terminals drop the logo before the preview", () => {
   assert.match(tiny, /more lines, press p to show them/);
 });
 
-test("cost and lines start hidden and are shown with space", () => {
+test("opt-in segments start hidden and are shown with space", () => {
   const menu = fresh();
   assert.match(plain(menu.frame(80, 40)), /Preset +‹ Default ›/);
   assert.match(plain(menu.frame(80, 40)), /○ {2}Cost/);
-  press(menu, ...Array(6).fill("ArrowDown"), " ", "ArrowDown", " ");
+  assert.match(plain(menu.frame(80, 40)), /○ {2}Effort/);
+  press(menu, "ArrowDown", "ArrowDown", " ");
+  assert.deepEqual(serializeOptions(menu.options()), ["--add=effort"]);
+  assert.match(plain(menu.frame(80, 40)), /┃ 🤖 Opus 4\.6 │ 🎚️ high │ 🧠/);
+  press(menu, "r");
+  press(menu, ...Array(5).fill("ArrowDown"), " ", "ArrowDown", " ");
   assert.deepEqual(serializeOptions(menu.options()), ["--add=cost,lines"]);
   assert.match(plain(menu.frame(80, 40)), /┃ .* \$0\.42 │ \+156 −23/);
   press(menu, "r");

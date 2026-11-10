@@ -37,9 +37,9 @@ export const SEPARATORS = {
   arrow: { glyph: "›", joiner: " › " },
 };
 
-export const FIRST_LINE = ["model", "context", "duration", "dir", "git", "cost", "lines", "update"];
+export const FIRST_LINE = ["model", "effort", "context", "duration", "dir", "git", "cost", "lines", "update"];
 // Segments that stay hidden until --add turns them on, so new ones never change a bar that works
-export const OPT_IN = ["cost", "lines"];
+export const OPT_IN = ["effort", "cost", "lines"];
 export const RATE_LIMITS = ["5h", "7d", "sonnet", "extra"];
 export const SEGMENTS = [...FIRST_LINE, ...RATE_LIMITS];
 

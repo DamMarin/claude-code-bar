@@ -9,6 +9,9 @@ so every release needs one.
 
 ## [Unreleased]
 
+### Added
+- An `effort` segment, off by default and turned on with `--add=effort` or in `--config`, shows the reasoning effort level Claude Code reports (`🎚️ high`). It sits after the model; an `--order` saved before it existed puts it last.
+
 ## [1.2.0] - 2026-10-28
 
 ### Added

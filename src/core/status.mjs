@@ -12,7 +12,7 @@ const money = (e, joiner) => `${formatMoney(e.usedCredits, e.currency)}${joiner}
 /**
  * Renders the status bar.
  *
- * data: { model, contextPct (null until known), contextTokens, contextSize, durationMs, dir,
+ * data: { model, effort | null, contextPct (null until known), contextTokens, contextSize, durationMs, dir,
  *         git: { branch, dirty, ahead, behind } | null, costUsd | null, lines: { added, removed } | null,
  *         update: latest version | null,
  *         limits: { fiveHour, sevenDay, sevenDaySonnet, extraUsage } }
@@ -61,6 +61,7 @@ export function renderStatus(data, options, { mark = [], noColor = false } = {})
   const lines = data.lines && (data.lines.added > 0 || data.lines.removed > 0) ? data.lines : null;
   const parts = {
     model: (u) => label(emoji ? "🤖 " : "", u) + paint(accent, data.model, u || m("accent")),
+    effort: (u) => (data.effort ? label(emoji ? "🎚️ " : "effort ", u) + paint({}, data.effort, u) : null),
     context: (u) => label(emoji ? "🧠 " : "ctx ", u) + (ctx === null
       ? paint({}, "–", u || m("pct"))
       : paint(levelStyle(ctx), contextText(), u || m("pct") || levelMarked(ctx))),
