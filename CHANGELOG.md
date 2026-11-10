@@ -9,6 +9,8 @@ so every release needs one.
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-11-10
+
 ### Added
 - An `effort` segment, off by default and turned on with `--add=effort` or in `--config`, shows the reasoning effort level Claude Code reports (`🎚️ high`). It sits after the model; an `--order` saved before it existed puts it last.
 
@@ -71,6 +73,7 @@ First stable release. Display options (`--theme`, `--colors`, `--thresholds`, `-
 Extra usage shown with currency amounts. Earlier 0.0.x releases are listed on the
 [releases page](https://github.com/DamMarin/claude-code-bar/releases).
 
+[1.3.0]: https://github.com/DamMarin/claude-code-bar/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/DamMarin/claude-code-bar/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/DamMarin/claude-code-bar/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/DamMarin/claude-code-bar/compare/v0.0.5...v1.0.0
