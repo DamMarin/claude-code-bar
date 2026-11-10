@@ -138,3 +138,10 @@ test("context as tokens", () => {
   assert.equal(head(["--context=tokens"], data({ contextSize: null })), "🧠 30%");
   assert.equal(head(["--context=both"], data({ contextPct: null, contextSize: 200000 })), "🧠 –");
 });
+
+test("effort sits after the model once added, and only when Claude Code reports it", () => {
+  assert.equal(render(["--no-color"], data({ effort: "high" })).head, "🤖 Opus 5.5 │ 🧠 30% │ ⏱️ 2m14s │ demo │ main*");
+  assert.equal(render(["--add=effort", "--no-color"], data({ effort: "high" })).head, "🤖 Opus 5.5 │ 🎚️ high │ 🧠 30% │ ⏱️ 2m14s │ demo │ main*");
+  assert.equal(render(["--add=effort", "--no-color", "--no-emoji"], data({ effort: "xhigh" })).head, "Opus 5.5 │ effort xhigh │ ctx 30% │ 2m14s │ demo │ main*");
+  assert.equal(render(["--add=effort", "--no-color"], data({ effort: null })).head, "🤖 Opus 5.5 │ 🧠 30% │ ⏱️ 2m14s │ demo │ main*");
+});

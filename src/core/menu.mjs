@@ -33,6 +33,7 @@ const THEME_INFO = {
 
 const SEGMENT_INFO = {
   model: ["Model", "Opus 4.6", "Shows which model the session is running."],
+  effort: ["Effort", "high", "The reasoning effort level the session runs at, as Claude Code reports it (low to max)."],
   context: ["Context", "30%", "How full the context window is, colored by level."],
   duration: ["Duration", "2m14s", "How long this session has been running."],
   dir: ["Directory", "my-project", "The folder Claude Code runs in. Hide it if you share screenshots."],
@@ -60,6 +61,7 @@ export function sampleStatus(now = Date.now()) {
   const at = (minutes) => new Date(now + minutes * 60000);
   return {
     model: "Opus 4.6",
+    effort: "high",
     contextPct: 30,
     contextTokens: 60000,
     contextSize: 200000,

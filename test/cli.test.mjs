@@ -457,7 +457,7 @@ const restored = (screen) => screen.includes(ENTER_SCREEN) && screen.lastIndexOf
 
 test("--config saves the options chosen in the menu", (t) => {
   const home = makeHome(t);
-  const result = runConfig(home, [DOWN, DOWN, DOWN, DOWN, " ", "\r"]);
+  const result = runConfig(home, [DOWN, DOWN, DOWN, DOWN, DOWN, " ", "\r"]);
   assert.equal(result.status, 0);
   assert.match(result.stdout, /✅ Saved to ~\/\.claude\/settings\.json\n\n {3}claude-code-bar --hide=dir\n/);
   assert.match(result.stderr, /Directory/); // the menu was drawn
@@ -623,4 +623,12 @@ test("install warns about slow package runners only", (t) => {
   assert.match(install("npx -y claude-code-bar@latest"), /through npx/);
   assert.doesNotMatch(install("bunx claude-code-bar"), /resolves the package/);
   assert.doesNotMatch(install("claude-code-bar"), /resolves the package/);
+});
+
+test("render shows the effort level when added, without control characters", (t) => {
+  const home = makeHome(t);
+  const flags = ["--hide=model,context,duration,dir,git,update,5h,7d,sonnet,extra", "--add=effort", "--no-color"];
+  assert.equal(run(home, flags, JSON.stringify({ effort: { level: "max" } })).stdout, "🎚️ max\n");
+  assert.equal(run(home, flags, JSON.stringify({ effort: { level: "hi\x1b[31mgh" } })).stdout, "🎚️ high\n");
+  assert.equal(run(home, flags, JSON.stringify({ effort: { level: 3 } })).stdout, "");
 });
